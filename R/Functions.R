@@ -14,6 +14,17 @@
 
 ##################################################
 
+
+#' A requied libraries Load and check Function
+#'
+#' This function allows you to check whether the required library has been installed, otherwise it will be installed and load.
+#' @param libs A character vector of names of required libraries.
+#' @keywords libraries
+#' @export
+#' @examples
+#' libs<-c("ggplot2","caTools")
+#' f_lib_check(libs)
+
 # Load and check libraries
 f_lib_check<-function(libs){
   for (lib in libs ){
@@ -24,7 +35,7 @@ f_lib_check<-function(libs){
     }
   }
 
-  a<-lapply(librs, require, character.only = TRUE)
+  a<-lapply(libs, require, character.only = TRUE)
 }
 
 

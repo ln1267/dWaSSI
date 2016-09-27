@@ -17,10 +17,12 @@
 #'
 #' This function allows you to express your love of cats.
 #' @param date Do you love cats? Defaults to TRUE.
+#' @param da Do you love cats? Defaults to TRUE.
 #' @keywords cats
 #' @export
 #' @examples
 #' numberOfDays("2001-01-01")
+#' this is ()
 
 
 
