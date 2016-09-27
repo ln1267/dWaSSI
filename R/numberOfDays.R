@@ -15,14 +15,13 @@
 
 #' A numberOfDays Function
 #'
-#' This function allows you to express your love of cats.
-#' @param date Do you love cats? Defaults to TRUE.
-#' @param da Do you love cats? Defaults to TRUE.
+#' This function allows you to get the number of days for a specific month.
+#' @param date A date object.
 #' @keywords cats
 #' @export
 #' @examples
-#' numberOfDays("2001-01-01")
-#' this is ()
+#' date<-as.Date("2001-01-01")
+#' numberOfDays(date)
 
 
 

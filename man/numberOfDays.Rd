@@ -7,16 +7,14 @@
 numberOfDays(date)
 }
 \arguments{
-\item{date}{Do you love cats? Defaults to TRUE.}
-
-\item{da}{Do you love cats? Defaults to TRUE.}
+\item{date}{A date object.}
 }
 \description{
-This function allows you to express your love of cats.
+This function allows you to get the number of days for a specific month.
 }
 \examples{
-numberOfDays("2001-01-01")
-this is ()
+date<-as.Date("2001-01-01")
+numberOfDays(date)
 }
 \keyword{cats}
 
