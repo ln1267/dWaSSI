@@ -46,6 +46,7 @@ f_WaSSI<-function(data_in,pars,soil_in,calibrate=NA,daily=F,y_s=NA,y_e=NA,scale=
     y_start<- as.Date(index(data_in)[1])
     y_end<-as.Date(index(data_in)[length(data_in[,1])])
     HydroTestData<-data_in
+    data_in_all<-data_in
   }else{
 
     ## creat the target data zoo
