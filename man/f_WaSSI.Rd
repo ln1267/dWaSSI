@@ -4,8 +4,8 @@
 \alias{f_WaSSI}
 \title{A f_WaSSI function}
 \usage{
-f_WaSSI(data_in, pars, soil_in, calibrate = NA, y_s = NA, y_e = NA,
-  scale = "month")
+f_WaSSI(data_in, pars, soil_in, calibrate = NA, daily = F, y_s = NA,
+  y_e = NA, scale = "month")
 }
 \arguments{
 \item{data_in}{this is the monthly dataframe data, which includes all main variabels (P, T, E, Q etc.)}
@@ -15,6 +15,8 @@ f_WaSSI(data_in, pars, soil_in, calibrate = NA, y_s = NA, y_e = NA,
 \item{soil_in}{A names vector inlcudes all soil parameters}
 
 \item{calibrate}{Default =NA, defines wheter calibrate model in watershed scale}
+
+\item{daily}{A logic object defined the scale of input data "default is daily=F monthly"}
 
 \item{y_s, y_e}{The start and end year for simulation}
 
