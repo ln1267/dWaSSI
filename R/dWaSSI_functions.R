@@ -35,10 +35,11 @@ f_ET_SUN<-function(data_monthly_frame,pars){
 #' @param pars A names vector inlcudes "ALT","LAT","LONG",and "VEG" infomation
 #' @param soil_in A names vector inlcudes all soil parameters
 #' @param calibrate Default =NA, defines wheter calibrate model in watershed scale
+#' @param daily A logic object defined the scale of input data "default is daily=F monthly"
 #' @param scale Simulation scale c("month","ann")
 #' @param y_s,y_e The start and end year for simulation
 
-f_WaSSI<-function(data_in,pars,soil_in,calibrate=NA,y_s=NA,y_e=NA,scale="month"){
+f_WaSSI<-function(data_in,pars,soil_in,calibrate=NA,daily=F,y_s=NA,y_e=NA,scale="month"){
 
   ## creat the target data zoo
   # defined the time range base on the input data frame
@@ -47,45 +48,54 @@ f_WaSSI<-function(data_in,pars,soil_in,calibrate=NA,y_s=NA,y_e=NA,scale="month")
 
   # daily time seqeue
   timeseq <- seq(as.POSIXct(y_start, tz = "GMT"),as.POSIXct(y_end, tz = "GMT"),by = "day")
-  # monthly time seqeue
-  timeseq_month <- seq(as.POSIXct(y_start, tz = "GMT"),as.POSIXct(y_end, tz = "GMT"),by = "month")
 
-  ## get the input monthly data
-  Date_monthly<-data.frame(YEAR=substr(as.character(timeseq_month),1,4),MONTH=substr(as.character(timeseq_month),6,7))
+  # if input is daily data
+  if(daily){
+  #print("Daily simulation")
+    data_daily<-data_in
 
-  # get the default P, T data
-  data_monthly<-data.frame(Date_monthly,P=data_in$P,T=data_in$T)
-  data_in_all<-as.zooreg(zoo(data_in[,c(-1,-2)], order.by = timeseq_month))
-  # get the Q validation data if exit
-  if (length(which(names(data_in) %in% "Q"))>0){data_monthly$Q<-data_in$Q}
+  }else{
 
-  # get the PET data if exit otherwise calculate it by "thornthwaite" with T and latitude
-  if (length(which(names(data_in) %in% "E"))>0){data_monthly$E<-data_in$E} else{data_monthly$E<-as.vector(thornthwaite(data_in$T,lat = pars["LAT"]))}
+    # monthly time seqeue
+    timeseq_month <- seq(as.POSIXct(y_start, tz = "GMT"),as.POSIXct(y_end, tz = "GMT"),by = "month")
 
-  # get Date info for all daily data
-  DATE_daily<-data.frame(YEAR=substr(as.character(timeseq),1,4),MONTH=substr(as.character(timeseq),6,7),DAY=substr(as.character(timeseq),9,10))
+    ## get the input monthly data
+    Date_monthly<-data.frame(YEAR=substr(as.character(timeseq_month),1,4),MONTH=substr(as.character(timeseq_month),6,7))
 
-  # get the number of days for each month
-  numberOfDays <- function(date) {
-    m <- format(date, format="%m")
+    # get the default P, T data
+    data_monthly<-data.frame(Date_monthly,P=data_in$P,T=data_in$T)
+    data_in_all<-as.zooreg(zoo(data_in[,c(-1,-2)], order.by = timeseq_month))
+    # get the Q validation data if exit
+    if (length(which(names(data_in) %in% "Q"))>0){data_monthly$Q<-data_in$Q}
 
-    while (format(date, format="%m") == m) {
-      date <- date + 1
+    # get the PET data if exit otherwise calculate it by "thornthwaite" with T and latitude
+    if (length(which(names(data_in) %in% "E"))>0){data_monthly$E<-data_in$E} else{data_monthly$E<-as.vector(thornthwaite(data_in$T,lat = pars["LAT"]))}
+
+    # get Date info for all daily data
+    DATE_daily<-data.frame(YEAR=substr(as.character(timeseq),1,4),MONTH=substr(as.character(timeseq),6,7),DAY=substr(as.character(timeseq),9,10))
+
+    # get the number of days for each month
+    numberOfDays <- function(date) {
+      m <- format(date, format="%m")
+
+      while (format(date, format="%m") == m) {
+        date <- date + 1
+      }
+
+      return(as.integer(format(date - 1, format="%d")))
     }
 
-    return(as.integer(format(date - 1, format="%d")))
+    days<-sapply(timeseq_month,function(x) numberOfDays(as.Date(x)))
+
+    # averaged the monthly summed data and join it to daily Date
+    ## get mean daily value
+    # index needed to averaged
+    index_ave<-which(!names(data_monthly) %in% c("ID","YEAR","MONTH","Tmin","T","Tmax","Tavg_C"))
+
+    data_monthly[,index_ave]<-data_monthly[,index_ave]/days
+
+    data_daily<-join(DATE_daily,data_monthly,by=c("YEAR","MONTH"))
   }
-
-  days<-sapply(timeseq_month,function(x) numberOfDays(as.Date(x)))
-
-  # averaged the monthly summed data and join it to daily Date
-  ## get mean daily value
-  # index needed to averaged
-  index_ave<-which(!names(data_monthly) %in% c("ID","YEAR","MONTH","Tmin","T","Tmax","Tavg_C"))
-
-  data_monthly[,index_ave]<-data_monthly[,index_ave]/days
-
-  data_daily<-join(DATE_daily,data_monthly,by=c("YEAR","MONTH"))
 
   HydroTestData <- as.zooreg(zoo(data_daily[,c(-1,-2,-3)], order.by = timeseq))
   head(HydroTestData)
@@ -219,8 +229,10 @@ f_WaSSI<-function(data_in,pars,soil_in,calibrate=NA,y_s=NA,y_e=NA,scale="month")
 #' @param pars A names vector inlcudes "ALT","LAT","LONG",and "VEG" infomation
 #' @param S_y,E_y The start and end year for input climate data
 #' @param S_y_LAI,E_y_LAI The start and end year for LAI data
+#' @param watershed whether calculate in watershed scale
+#' @param Q A dataframe of Q data with c["YEAR","Month","Q"]
 
-f_cal_WaSSI<-function(lin,S_y,E_y,S_y_LAI,E_y_LAI){
+f_cal_WaSSI<-function(lin,S_y,E_y,S_y_LAI,E_y_LAI,watershed=F,Q=NA){
 
   Year_C<-rep(c(S_y:E_y), each=12)
   Month_C<-rep(c(1:12),E_y-S_y+1)
@@ -228,9 +240,12 @@ f_cal_WaSSI<-function(lin,S_y,E_y,S_y_LAI,E_y_LAI){
 
   data_monthly_frame<-data.frame(Date.frame,P=lin[1:length(Month_C)],T=lin[(length(Month_C)+1):(2*length(Month_C))],LAI=NA)
 
+  # in watershed scale merge Q data by date
+  if( watershed){ data_monthly_frame<-merge(data_monthly_frame,Q[c(1,2,3)],by=c("YEAR","Month"),all.x=T) }
+
   data_monthly_frame$LAI[(Date.frame$YEAR %in% Year_LAI)]<-lin[(2*length(Month_C)+1):(2*length(Month_C)+12*length(Year_LAI))]
 
-  # give the oldest LAI to the history
+    # give the oldest LAI to the history
   if (S_y_LAI > S_y){
     data_monthly_frame$LAI[(Date.frame$YEAR < S_y_LAI)]<-data_monthly_frame$LAI[(Date.frame$YEAR == S_y_LAI)]
   }
