@@ -230,9 +230,11 @@ f_WaSSI<-function(data_in,pars,soil_in,calibrate=NA,daily=F,y_s=NA,y_e=NA,scale=
 #' @param S_y,E_y The start and end year for input climate data
 #' @param S_y_LAI,E_y_LAI The start and end year for LAI data
 #' @param watershed whether calculate in watershed scale
+#' @param calibrate whether calibrate first
+#' @param y_s,y_e the simulate start and end year
 #' @param Q A dataframe of Q data with c["YEAR","Month","Q"]
 
-f_cal_WaSSI<-function(lin,S_y,E_y,S_y_LAI,E_y_LAI,watershed=F,Q=NA){
+f_cal_WaSSI<-function(lin,S_y,E_y,S_y_LAI,E_y_LAI,watershed=F,Q=NA,calibrate=NA,y_s=NA,y_e=NA){
 
   Year_C<-rep(c(S_y:E_y), each=12)
   Month_C<-rep(c(1:12),E_y-S_y+1)
@@ -241,7 +243,7 @@ f_cal_WaSSI<-function(lin,S_y,E_y,S_y_LAI,E_y_LAI,watershed=F,Q=NA){
   data_monthly_frame<-data.frame(Date.frame,P=lin[1:length(Month_C)],T=lin[(length(Month_C)+1):(2*length(Month_C))],LAI=NA)
 
   # in watershed scale merge Q data by date
-  if( watershed){ data_monthly_frame<-merge(data_monthly_frame,Q[c(1,2,3)],by=c("YEAR","Month"),all.x=T) }
+  if( watershed){ data_monthly_frame<-merge(data_monthly_frame,Q,by=c("YEAR","Month"),all.x=T) }
 
   data_monthly_frame$LAI[(Date.frame$YEAR %in% Year_LAI)]<-lin[(2*length(Month_C)+1):(2*length(Month_C)+12*length(Year_LAI))]
 
@@ -266,7 +268,7 @@ f_cal_WaSSI<-function(lin,S_y,E_y,S_y_LAI,E_y_LAI,watershed=F,Q=NA){
   # calculate SUN-ET
   data_monthly_frame<-f_ET_SUN(data_monthly_frame,pars=pars)
 
-  result<-f_WaSSI(data_monthly_frame,pars,soil_in,y_s=1982,y_e=2014,scale="month")
+  result<-f_WaSSI(data_monthly_frame,pars,soil_in,calibrate=calibrate,y_s=y_s,y_e=y_e,scale="month")
   result
   #print(head(result))
 

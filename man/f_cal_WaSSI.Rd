@@ -4,7 +4,8 @@
 \alias{f_cal_WaSSI}
 \title{Calculate WaSSI for each pixel function}
 \usage{
-f_cal_WaSSI(lin, S_y, E_y, S_y_LAI, E_y_LAI, watershed = F, Q = NA)
+f_cal_WaSSI(lin, S_y, E_y, S_y_LAI, E_y_LAI, watershed = F, Q = NA,
+  calibrate = NA, y_s = NA, y_e = NA)
 }
 \arguments{
 \item{lin}{this is vector data, which includes all main variabels (P, T, E, Q etc.)}
@@ -16,6 +17,10 @@ f_cal_WaSSI(lin, S_y, E_y, S_y_LAI, E_y_LAI, watershed = F, Q = NA)
 \item{watershed}{whether calculate in watershed scale}
 
 \item{Q}{A dataframe of Q data with c["YEAR","Month","Q"]}
+
+\item{calibrate}{whether calibrate first}
+
+\item{y_s, y_e}{the simulate start and end year}
 
 \item{pars}{A names vector inlcudes "ALT","LAT","LONG",and "VEG" infomation}
 }
