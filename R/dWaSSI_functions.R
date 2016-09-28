@@ -134,10 +134,27 @@ f_WaSSI<-function(data_in,pars,soil_in,calibrate=NA,y_s=NA,y_e=NA,scale="month")
 
     # print the summary info for the fitted model
     print(summary(fitx))
-    NSE(fitx$data[,"Q"],fitx$U[,"U"])
+    print("NSE=")
+    print(NSE(fitx$data[,"Q"],fitx$U[,"U"]))
 
     # plot fitted result with P
-    xyplot(fitx, with.P = TRUE, type = c("l", "g"))
+    xyplot(fitx$parlist, with.P = TRUE, type = c("l", "g"))
+
+    # transfer soil input
+    soil_pars<-list("uztwm" = 1, "uzfwm" = 150, "uzk" = 0.1, "pctim" = 1e-06, "adimp" = 0,
+                    "zperc" = 28.8997, "rexp" = 5, "lztwm" = 205.652, "lzfsm" = 758.774,
+                    "lzfpm" = 1000, "lzsk" = 0.149213, "lzpk" = 0.00607691, "pfree" = 0.582714)
+    soil_pars[c("uztwm" ,"uzfwm","uzk","zperc", "rexp", "lztwm", "lzfsm","lzfpm", "lzsk", "lzpk", "pfree")]<-fitx$parlist[c("uztwm" ,"uzfwm","uzk","zperc", "rexp", "lztwm", "lzfsm","lzfpm", "lzsk", "lzpk", "pfree")]
+
+    # simulate Q with SMA-SAC model get all soil moisture data
+    out<-sacramento.sim(HydroTestData[index_sim,],uztwm = soil_pars["uztwm"], uzfwm = soil_pars["uzfwm"], uzk = soil_pars["uzk"], pctim = soil_pars["pctim"], adimp = soil_pars["adimp"],
+                        zperc = soil_pars["zperc"], rexp = soil_pars["rexp"], lztwm = soil_pars["lztwm"], lzfsm = soil_pars["lzfsm"],
+                        lzfpm = soil_pars["lzfpm"], lzsk = soil_pars["lzsk"], lzpk = soil_pars["lzpk"], pfree = soil_pars["pfree"],return_state = T)
+
+    # print the summary info for the fitted model
+    #print(summary(out))
+    # print(head(out) )
+
 
   }else{
     ### Calculate ET based on SAM-SAC with soil parameters inputs
