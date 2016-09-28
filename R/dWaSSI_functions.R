@@ -157,7 +157,7 @@ f_WaSSI<-function(data_in,pars,soil_in,calibrate=NA,daily=F,y_s=NA,y_e=NA,scale=
     print(NSE(fitx$data[,"Q"],fitx$U[,"U"]))
 
     # plot fitted result with P
-    #xyplot(fitx$parlist, with.P = TRUE, type = c("l", "g"))
+    xyplot(fitx, with.P = TRUE, type = c("l", "g"))
 
     # transfer soil input
     soil_pars<-list("uztwm" = 1, "uzfwm" = 150, "uzk" = 0.1, "pctim" = 1e-06, "adimp" = 0,
@@ -202,23 +202,41 @@ f_WaSSI<-function(data_in,pars,soil_in,calibrate=NA,daily=F,y_s=NA,y_e=NA,scale=
 
   # output result
   if( scale=="MONTH" | scale=="month" ){
-    result_mon<-daily2monthly(out_result,FUN = sum,na.rm = T,out.fmt = "%Y-%m-%d")
 
     # input data
-    #timeseq_month
-    index_in<-which(index(data_in_all)<= as.POSIXct(y_end_sim) & index(data_in_all)>= as.POSIXct(y_start_sim) )
-    data_in_all<-data_in_all[index_in,]
-    # index_T<-which(names(data_in_all) %in% c("T","Tmin","Tmax"))
-    # index_NT<-which(! names(data_in_all) %in% c("T","Tmin","Tmax"))
-    #
-    # Water_mon<-daily2monthly(data_in_all[,index_NT],FUN=sum,na.rm = T)
-    # Temp_mon<-daily2monthly(data_in_all[,index_T],FUN=mean,na.rm = T)
-    # HydroTestData_mon<-cbind(Water_mon,Temp_mon)
-    index(result_mon)<-index(data_in_all)
-    result_mon<-merge(data_in_all,result_mon)
-    summary(result_mon)
-    head(result_mon)
-    result_mon
+    if(daily){
+
+      index_in<-which(index(data_in_all)<= as.POSIXct(y_end_sim) & index(data_in_all)>= as.POSIXct(y_start_sim) )
+      data_in_all<-data_in_all[index_in,]
+      # index_T<-which(names(data_in_all) %in% c("T","Tmin","Tmax"))
+      # index_NT<-which(! names(data_in_all) %in% c("T","Tmin","Tmax"))
+      #
+      # Water_mon<-daily2monthly(data_in_all[,index_NT],FUN=sum,na.rm = T)
+      # Temp_mon<-daily2monthly(data_in_all[,index_T],FUN=mean,na.rm = T)
+      # HydroTestData_mon<-cbind(Water_mon,Temp_mon)
+      out_result<-merge(data_in_all,out_result)
+      result_mon<-daily2monthly(out_result,FUN = sum,na.rm = T,out.fmt = "%Y-%m-%d")
+      summary(result_mon)
+      head(result_mon)
+      result_mon
+    }else{
+      result_mon<-daily2monthly(out_result,FUN = sum,na.rm = T,out.fmt = "%Y-%m-%d")
+
+      #timeseq_month
+      index_in<-which(index(data_in_all)<= as.POSIXct(y_end_sim) & index(data_in_all)>= as.POSIXct(y_start_sim) )
+      data_in_all<-data_in_all[index_in,]
+      # index_T<-which(names(data_in_all) %in% c("T","Tmin","Tmax"))
+      # index_NT<-which(! names(data_in_all) %in% c("T","Tmin","Tmax"))
+      #
+      # Water_mon<-daily2monthly(data_in_all[,index_NT],FUN=sum,na.rm = T)
+      # Temp_mon<-daily2monthly(data_in_all[,index_T],FUN=mean,na.rm = T)
+      # HydroTestData_mon<-cbind(Water_mon,Temp_mon)
+      index(result_mon)<-index(data_in_all)
+      result_mon<-merge(data_in_all,result_mon)
+      summary(result_mon)
+      head(result_mon)
+      result_mon
+    }
   }else if(scale=="ANN" | scale=="ann"){
     result_ann<-daily2annual(out_result,FUN = sum,na.rm = T)
     summary(result_ann)
