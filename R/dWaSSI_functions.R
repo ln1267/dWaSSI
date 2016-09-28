@@ -41,63 +41,71 @@ f_ET_SUN<-function(data_monthly_frame,pars){
 
 f_WaSSI<-function(data_in,pars,soil_in,calibrate=NA,daily=F,y_s=NA,y_e=NA,scale="month"){
 
-  ## creat the target data zoo
-  # defined the time range base on the input data frame
-  y_start<-paste(min(data_in$YEAR),"-01-01",sep="")
-  y_end<-paste(max(data_in$YEAR),"-12-31",sep="")
-
-  # daily time seqeue
-  timeseq <- seq(as.POSIXct(y_start, tz = "GMT"),as.POSIXct(y_end, tz = "GMT"),by = "day")
-
-  # if input is daily data
-  if(daily){
-  #print("Daily simulation")
-    data_daily<-data_in
-
+  # if the input is a zoo
+  if(is.zoo(data_in)){
+    y_start<- as.Date(index(data_in)[1])
+    y_end<-as.Date(index(data_in)[length(data_in[,1])])
+    HydroTestData<-data_in
   }else{
 
-    # monthly time seqeue
-    timeseq_month <- seq(as.POSIXct(y_start, tz = "GMT"),as.POSIXct(y_end, tz = "GMT"),by = "month")
+    ## creat the target data zoo
+    # defined the time range base on the input data frame
+    y_start<-paste(min(data_in$YEAR),"-01-01",sep="")
+    y_end<-paste(max(data_in$YEAR),"-12-31",sep="")
 
-    ## get the input monthly data
-    Date_monthly<-data.frame(YEAR=substr(as.character(timeseq_month),1,4),MONTH=substr(as.character(timeseq_month),6,7))
+    # daily time seqeue
+    timeseq <- seq(as.POSIXct(y_start, tz = "GMT"),as.POSIXct(y_end, tz = "GMT"),by = "day")
 
-    # get the default P, T data
-    data_monthly<-data.frame(Date_monthly,P=data_in$P,T=data_in$T)
-    data_in_all<-as.zooreg(zoo(data_in[,c(-1,-2)], order.by = timeseq_month))
-    # get the Q validation data if exit
-    if (length(which(names(data_in) %in% "Q"))>0){data_monthly$Q<-data_in$Q}
+    # if input is daily data
+    if(daily){
+    #print("Daily simulation")
+      data_daily<-data_in
 
-    # get the PET data if exit otherwise calculate it by "thornthwaite" with T and latitude
-    if (length(which(names(data_in) %in% "E"))>0){data_monthly$E<-data_in$E} else{data_monthly$E<-as.vector(thornthwaite(data_in$T,lat = pars["LAT"]))}
+    }else{
 
-    # get Date info for all daily data
-    DATE_daily<-data.frame(YEAR=substr(as.character(timeseq),1,4),MONTH=substr(as.character(timeseq),6,7),DAY=substr(as.character(timeseq),9,10))
+      # monthly time seqeue
+      timeseq_month <- seq(as.POSIXct(y_start, tz = "GMT"),as.POSIXct(y_end, tz = "GMT"),by = "month")
 
-    # get the number of days for each month
-    numberOfDays <- function(date) {
-      m <- format(date, format="%m")
+      ## get the input monthly data
+      Date_monthly<-data.frame(YEAR=substr(as.character(timeseq_month),1,4),MONTH=substr(as.character(timeseq_month),6,7))
 
-      while (format(date, format="%m") == m) {
-        date <- date + 1
+      # get the default P, T data
+      data_monthly<-data.frame(Date_monthly,P=data_in$P,T=data_in$T)
+      data_in_all<-as.zooreg(zoo(data_in[,c(-1,-2)], order.by = timeseq_month))
+      # get the Q validation data if exit
+      if (length(which(names(data_in) %in% "Q"))>0){data_monthly$Q<-data_in$Q}
+
+      # get the PET data if exit otherwise calculate it by "thornthwaite" with T and latitude
+      if (length(which(names(data_in) %in% "E"))>0){data_monthly$E<-data_in$E} else{data_monthly$E<-as.vector(thornthwaite(data_in$T,lat = pars["LAT"]))}
+
+      # get Date info for all daily data
+      DATE_daily<-data.frame(YEAR=substr(as.character(timeseq),1,4),MONTH=substr(as.character(timeseq),6,7),DAY=substr(as.character(timeseq),9,10))
+
+      # get the number of days for each month
+      numberOfDays <- function(date) {
+        m <- format(date, format="%m")
+
+        while (format(date, format="%m") == m) {
+          date <- date + 1
+        }
+
+        return(as.integer(format(date - 1, format="%d")))
       }
 
-      return(as.integer(format(date - 1, format="%d")))
+      days<-sapply(timeseq_month,function(x) numberOfDays(as.Date(x)))
+
+      # averaged the monthly summed data and join it to daily Date
+      ## get mean daily value
+      # index needed to averaged
+      index_ave<-which(!names(data_monthly) %in% c("ID","YEAR","MONTH","Tmin","T","Tmax","Tavg_C"))
+
+      data_monthly[,index_ave]<-data_monthly[,index_ave]/days
+
+      data_daily<-join(DATE_daily,data_monthly,by=c("YEAR","MONTH"))
     }
 
-    days<-sapply(timeseq_month,function(x) numberOfDays(as.Date(x)))
-
-    # averaged the monthly summed data and join it to daily Date
-    ## get mean daily value
-    # index needed to averaged
-    index_ave<-which(!names(data_monthly) %in% c("ID","YEAR","MONTH","Tmin","T","Tmax","Tavg_C"))
-
-    data_monthly[,index_ave]<-data_monthly[,index_ave]/days
-
-    data_daily<-join(DATE_daily,data_monthly,by=c("YEAR","MONTH"))
+    HydroTestData <- as.zooreg(zoo(data_daily[,c(-1,-2,-3)], order.by = timeseq))
   }
-
-  HydroTestData <- as.zooreg(zoo(data_daily[,c(-1,-2,-3)], order.by = timeseq))
   head(HydroTestData)
 
   ##  Simulate snow
