@@ -57,7 +57,7 @@ f_WaSSI<-function(data_in,pars,soil_in,calibrate=NA,y_s=NA,y_e=NA,scale="month")
   data_monthly<-data.frame(Date_monthly,P=data_in$P,T=data_in$T)
   data_in_all<-as.zooreg(zoo(data_in[,c(-1,-2)], order.by = timeseq_month))
   # get the Q validation data if exit
-  if (length(which(names(data_in) %in% "Q"))==0){data_monthly$Q<-data_in$Q}
+  if (length(which(names(data_in) %in% "Q"))>0){data_monthly$Q<-data_in$Q}
 
   # get the PET data if exit otherwise calculate it by "thornthwaite" with T and latitude
   if (length(which(names(data_in) %in% "E"))>0){data_monthly$E<-data_in$E} else{data_monthly$E<-as.vector(thornthwaite(data_in$T,lat = pars["LAT"]))}
