@@ -148,7 +148,7 @@ f_WaSSI<-function(data_in,pars,soil_in,calibrate=NA,daily=F,y_s=NA,y_e=NA,scale=
     print(NSE(fitx$data[,"Q"],fitx$U[,"U"]))
 
     # plot fitted result with P
-    hydromad::xyplot(fitx$parlist, with.P = TRUE, type = c("l", "g"))
+    xyplot(fitx$parlist, with.P = TRUE, type = c("l", "g"))
 
     # transfer soil input
     soil_pars<-list("uztwm" = 1, "uzfwm" = 150, "uzk" = 0.1, "pctim" = 1e-06, "adimp" = 0,
