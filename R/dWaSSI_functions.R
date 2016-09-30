@@ -264,6 +264,7 @@ f_WaSSI<-function(data_in,pars,soil_in,calibrate=NA,daily=F,y_s=NA,y_e=NA,scale=
 f_cal_WaSSI<-function(lin,S_y,E_y,S_y_LAI,E_y_LAI,watershed=F,Q=NA,calibrate=NA,y_s=NA,y_e=NA){
 
   Year_C<-rep(c(S_y:E_y), each=12)
+  Year_LAI<-c(S_y_LAI:E_y_LAI)
   Month_C<-rep(c(1:12),E_y-S_y+1)
   Date.frame<-data.frame(YEAR=Year_C,Month=Month_C)
 
