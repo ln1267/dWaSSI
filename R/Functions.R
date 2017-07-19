@@ -31,7 +31,7 @@ f_lib_check<-function(libs){
     if(lib %in% rownames(installed.packages())){
 
     }else{
-      install.packages(lib)
+      install.packages(lib,repos='http://cran.us.r-project.org')
     }
   }
 
