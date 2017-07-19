@@ -307,9 +307,9 @@ f_cal_WaSSI<-function(lin,S_y,E_y,S_y_LAI,E_y_LAI,watershed=F,Q=NA,calibrate=NA,
   soil_in<-list("uztwm" = 1, "uzfwm" = 150, "uzk" = 0.1, "zperc" = 28.8997, "rexp" = 5, "lztwm" = 205.652, "lzfsm" = 758.774,
                 "lzfpm" = 1000, "lzsk" = 0.149213, "lzpk" = 0.00607691, "pfree" = 0.582714)
 
-  soil_in[1:11]<-lin[(length(lin)-14):(length(lin)-4)]
+  soil_in[1:11]<-lin[(length(lin)-16):(length(lin)-6)]
 
-  pars<-c("ALT"=lin[(length(lin)-3)],"LAT"=lin[(length(lin)-2)],"LONG"=lin[(length(lin)-1)],"VEG"=lin[(length(lin)-0)])
+  pars<-c("ALT"=lin[(length(lin)-5)],"LAT"=lin[(length(lin)-4)],"LONG"=lin[(length(lin)-3)],"WUE"=lin[(length(lin)-2)],"ER_m"=lin[(length(lin)-1)],"ER_n"=lin[(length(lin)-0)])
 
   # calculate SUN-ET
   data_monthly_frame<-f_ET_SUN(data_monthly_frame,pars=pars)
