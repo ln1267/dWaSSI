@@ -653,3 +653,67 @@ multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
     }
   }
 }
+# convert daily data to annual (zoo)
+daily2annual<-function (x, FUN, na.rm = TRUE, out.fmt = "%Y-%m-%d", ...)
+{
+  if (missing(FUN))
+    stop("Missing argument value: 'FUN' must contain a valid function for aggregating the values")
+  if (sfreq(x) %in% c("annual"))
+    stop("Invalid argument: 'x' is already an annual ts !!")
+  if (is.na(match(out.fmt, c("%Y", "%Y-%m-%d"))))
+    stop("Invalid argument: 'out.fmt' must be in c('%Y', '%Y-%m-%d')")
+  dates <- time(x)
+  y <- as.numeric(format(dates, "%Y"))
+  years <- factor(y, levels = unique(y))
+  tmp <- aggregate(x, by = years, FUN, na.rm = na.rm)
+  nan.index <- which(is.nan(tmp))
+  if (length(nan.index) > 0)
+    tmp[nan.index] <- NA
+  inf.index <- which(is.infinite(tmp))
+  if (length(inf.index) > 0)
+    tmp[inf.index] <- NA
+  if (out.fmt == "%Y") {
+    time(tmp) <- format(time(tmp), "%Y")
+  }
+  else time(tmp) <- as.Date(paste(time(tmp), "-01-01", sep = ""))
+  if (NCOL(tmp) == 1)
+    tmp <- zoo(as.numeric(tmp), time(tmp))
+  return(tmp)
+}
+
+# convert daily data to monthly (zoo)
+daily2monthly<-function (x, FUN, na.rm = TRUE, ...)
+{
+  if (missing(FUN))
+    stop("Missing argument value: 'FUN' must contain a valid function for aggregating the values")
+  if (sfreq(x) %in% c("monthly", "quarterly", "annual"))
+    stop("Invalid argument: 'x' is not a (sub)daily/weekly ts. 'x' is a ",
+         sfreq(x), " ts")
+  dates <- time(x)
+  months <- as.Date(as.yearmon(time(x)))
+  tmp <- aggregate(x, by = months, FUN, na.rm = na.rm)
+  nan.index <- which(is.nan(tmp))
+  if (length(nan.index) > 0)
+    tmp[nan.index] <- NA
+  inf.index <- which(is.infinite(tmp))
+  if (length(inf.index) > 0)
+    tmp[inf.index] <- NA
+  if (NCOL(tmp) == 1)
+    tmp <- zoo(as.numeric(tmp), time(tmp))
+  return(tmp)
+}
+
+sfreq <- function(x, min.year=1800) {
+
+  # Checking that 'class(x)'
+  valid.class <- c("xts", "zoo")
+  if (length(which(!is.na(match(class(x), valid.class )))) <= 0)
+    stop("Invalid argument: 'x' must be in c('xts', 'zoo')" )
+
+  out <- periodicity(x)$scale # xts::periodicity
+
+  if (out == "yearly") out <- "annual"
+
+  return(out)
+
+}
