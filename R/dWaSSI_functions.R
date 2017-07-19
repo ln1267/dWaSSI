@@ -233,12 +233,30 @@ f_WaSSI<-function(data_in,pars,soil_in,calibrate=NA,daily=F,y_s=NA,y_e=NA,scale=
       # HydroTestData_mon<-cbind(Water_mon,Temp_mon)
       index(result_mon)<-index(data_in_all)
       result_mon<-merge(data_in_all,result_mon)
+
+      # calculate GEP based on AET and WUE
+      GEP<-result_mon[,"AET"] * pars["WUE"]
+      # calculate RE based on relationship between RE and ET for vegetation types
+      ER<-result_mon[,"AET"]*pars["ER_m"]+pars["ER_n"]
+
+      # merge carbon variables
+      result_mon<-merge(result_mon,GEP,ER)
+
       summary(result_mon)
       head(result_mon)
       result_mon
     }
   }else if(scale=="ANN" | scale=="ann"){
     result_ann<-daily2annual(out_result,FUN = sum,na.rm = T)
+
+    # calculate GEP based on AET and WUE
+    GEP<-result_ann[,"AET"] * pars["WUE"]
+    # calculate RE based on relationship between RE and ET for vegetation types
+    ER<-result_ann[,"AET"]*pars["ER_m"]+pars["ER_n"]
+
+    # merge carbon variables
+    result_ann<-merge(result_ann,GEP,ER)
+
     summary(result_ann)
     head(result_ann)
     result_ann
