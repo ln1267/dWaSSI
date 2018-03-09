@@ -2,8 +2,7 @@
 % Please edit documentation in R/Functions.R
 \name{f_2raster}
 \alias{f_2raster}
-\title{Transfering matrix/array to raster/brick
-This function allows you to transfer a matrix/array to a raster/brick.}
+\title{Transfering matrix/array to raster/brick}
 \usage{
 f_2raster(data, infonc = NA)
 }
@@ -14,7 +13,6 @@ f_2raster(data, infonc = NA)
 }
 \description{
 Transfering matrix/array to raster/brick
-This function allows you to transfer a matrix/array to a raster/brick.
 }
 \examples{
 rc<-f_2raster(darray,infonc="/Dataset/backup/CABLE/ET_ann_82_14.nc")

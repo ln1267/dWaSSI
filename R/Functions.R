@@ -745,3 +745,78 @@ f_2raster<-function(data,infonc=NA){
   }
   return(.grid)
 }
+
+#' Zonal raster/brick based on a shapefile
+#' @param ncfilename A filename for a "raster*" type object.
+#' @param basin A ploygon object.
+#' @param fun function for doing zonal (fun="mean"/"sum")
+#' @param varname define the variable name
+#' @param zonal_field select the field from shapefile file for naming the result
+#' @param start the start year for the time series of the input raster
+#' @param scale the time step the the input raster
+#' @keywords zonal
+#' @export
+#' @examples
+#' sta_shp<-f_sta_shp_nc(ncfilename="/Dataset/backup/CABLE/ET_ann_82_14.nc",
+#' basin,fun="sum",varname="ET",zonal_field="Station",start=1982,scale="annual")
+#'
+
+# zonal brick
+
+f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,start,scale="month",df=T){
+  require(reshape2)
+  require(raster)
+  da<-brick(ncfilename)
+  NAvalue(da)<- 0
+  if(fun=="mean" | fun=="Mean" | fun=="MEAN"){
+    ex <- raster::extract(da, basin, fun=mean, na.rm=TRUE, df=df,weights=TRUE,normalizWeights=TRUE, small=TRUE)
+  }else{
+    ex <- raster::extract(da, basin, fun=sum, na.rm=TRUE, df=df,weights=TRUE,normalizWeights=TRUE, small=TRUE)
+  }
+
+  if (df){
+    sta_catchment<-as.data.frame(t(ex[-1]))
+
+    if(scale=="month" | scale=="Month" | scale=="MONTH"){
+      dates<-seq(as.Date(paste(start,"01-01",sep="-")),by="1 month",length.out = dim(da)[3])
+      sta_catchment$Year<-as.integer(format(dates,"%Y"))
+      sta_catchment$Month<-as.integer(format(dates,"%m"))
+      names(sta_catchment)<-c(as.character(basin[[zonal_field]]),"Year","Month")
+      sta_catchment<-melt(sta_catchment,id=c("Year","Month"))
+      names(sta_catchment)<-c("Year","Month",zonal_field,varname)
+
+    }else if(scale=="annual" | scale=="Annual" | scale=="ANNUAL"){
+      dates<-seq(as.Date(paste(start,"01-01",sep="-")),by="1 year",length.out = dim(da)[3])
+      sta_catchment$Year<-as.integer(format(dates,"%Y"))
+      names(sta_catchment)<-c(as.character(basin[[zonal_field]]),"Year")
+      sta_catchment<-melt(sta_catchment,id=c("Year"))
+      names(sta_catchment)<-c("Year",zonal_field,varname)
+
+    }else{
+      dates<-seq(as.Date(paste(start,"01-01",sep="-")),by="1 day",length.out = dim(da)[3])
+      sta_catchment$Year<-as.integer(format(dates,"%Y"))
+      sta_catchment$Month<-as.integer(format(dates,"%m"))
+      sta_catchment$Day<-as.integer(format(dates,"%d"))
+      names(sta_catchment)<-c(as.character(basin[[zonal_field]]),"Year","Month","Day")
+      sta_catchment<-melt(sta_catchment,id=c("Year","Month","Day"))
+      names(sta_catchment)<-c("Year","Month","Day",zonal_field,varname)
+    }
+  }else{
+    sta_catchment<-ex
+
+    if(scale=="month" | scale=="Month" | scale=="MONTH"){
+      # names(sta_catchment)<-as.character(seq(as.Date(paste(start,"01-01",sep="-")),by="1 month",length.out = dim(da)[3]))
+      rownames(sta_catchment)<-as.character(basin[[zonal_field]])
+
+    }else if(scale=="annual" | scale=="Annual" | scale=="ANNUAL"){
+      # names(sta_catchment)<-as.character(seq(as.Date(paste(start,"01-01",sep="-")),by="1 year",length.out = dim(da)[3]))
+      rownames(sta_catchment)<-as.character(basin[[zonal_field]])
+
+    }else{
+      #  names(sta_catchment)<-as.character(seq(as.Date(paste(start,"01-01",sep="-")),by="1 day",length.out = dim(da)[3]))
+      rownames(sta_catchment)<-as.character(basin[[zonal_field]])
+    }
+
+  }
+  sta_catchment
+}

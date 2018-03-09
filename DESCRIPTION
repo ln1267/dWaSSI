@@ -1,10 +1,10 @@
 Package: dWaSSI
 Type: Package
 Title: This is a package including functions for dWaSSI-C model
-Version: 0.1.0
+Version: 0.1.1
 Author: Ning Liu
-Maintainer: Ning Liu <N.Liu@murdoch.eu.au>
-Description: This is a R version of dWaSSI-C model
-License: What license is it under?
+Maintainer: Ning Liu<N.Liu@murdoch.eu.au>
+Description: This is a R version of dWaSSI-C model and some functions for spatial data process
+License: NO
 LazyData: TRUE
 RoxygenNote: 6.0.1
