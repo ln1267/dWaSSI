@@ -754,24 +754,25 @@ f_2raster<-function(data,infonc=NA){
 #' @param zonal_field select the field from shapefile file for naming the result
 #' @param start the start year for the time series of the input raster
 #' @param scale the time step the the input raster
+#' @param weight Whether weight polygon for mean
 #' @keywords zonal
 #' @export
 #' @examples
 #' sta_shp<-f_sta_shp_nc(ncfilename="/Dataset/backup/CABLE/ET_ann_82_14.nc",
-#' basin,fun="sum",varname="ET",zonal_field="Station",start=1982,scale="annual")
+#' basin,fun="mean",varname="ET",zonal_field="Station",start=1982,scale="annual")
 #'
 
 # zonal brick
 
-f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,start,scale="month",df=T){
+f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,start,scale="month",df=T,weight=T){
   require(reshape2)
   require(raster)
   da<-brick(ncfilename)
   NAvalue(da)<- 0
   if(fun=="mean" | fun=="Mean" | fun=="MEAN"){
-    ex <- raster::extract(da, basin, fun=mean, na.rm=TRUE, df=df,weights=TRUE,normalizWeights=TRUE, small=TRUE)
+    ex <- raster::extract(da, basin, fun=mean, na.rm=TRUE, df=df,weights=weight,normalizWeights=TRUE, small=TRUE)
   }else{
-    ex <- raster::extract(da, basin, fun=sum, na.rm=TRUE, df=df,weights=TRUE,normalizWeights=TRUE, small=TRUE)
+    ex <- raster::extract(da, basin, fun=sum, na.rm=TRUE, df=df,normalizWeights=TRUE, small=TRUE)
   }
 
   if (df){

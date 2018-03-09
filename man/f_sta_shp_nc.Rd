@@ -5,7 +5,7 @@
 \title{Zonal raster/brick based on a shapefile}
 \usage{
 f_sta_shp_nc(ncfilename, basin, fun = "mean", varname, zonal_field, start,
-  scale = "month", df = T)
+  scale = "month", df = T, weight = T)
 }
 \arguments{
 \item{ncfilename}{A filename for a "raster*" type object.}
@@ -21,13 +21,15 @@ f_sta_shp_nc(ncfilename, basin, fun = "mean", varname, zonal_field, start,
 \item{start}{the start year for the time series of the input raster}
 
 \item{scale}{the time step the the input raster}
+
+\item{weight}{Whether weight polygon for mean}
 }
 \description{
 Zonal raster/brick based on a shapefile
 }
 \examples{
 sta_shp<-f_sta_shp_nc(ncfilename="/Dataset/backup/CABLE/ET_ann_82_14.nc",
-basin,fun="sum",varname="ET",zonal_field="Station",start=1982,scale="annual")
+basin,fun="mean",varname="ET",zonal_field="Station",start=1982,scale="annual")
 
 }
 \keyword{zonal}
