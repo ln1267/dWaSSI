@@ -5,7 +5,7 @@
 \title{Zonal raster/brick based on a shapefile}
 \usage{
 f_sta_shp_nc(ncfilename, basin, fun = "mean", varname, zonal_field, start,
-  scale = "month", df = T, weight = T)
+  scale = "month", df = T, weight = T, plot = T)
 }
 \arguments{
 \item{ncfilename}{A filename for a "raster*" type object.}

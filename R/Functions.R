@@ -764,15 +764,19 @@ f_2raster<-function(data,infonc=NA){
 
 # zonal brick
 
-f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,start,scale="month",df=T,weight=T){
+f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,start,scale="month",df=T,weight=T,plot=T){
   require(reshape2)
   require(raster)
   da<-brick(ncfilename)
   NAvalue(da)<- 0
+  if(plot) {
+    plot(da[[1]])
+    plot(basin,add=T)
+  }
   if(fun=="mean" | fun=="Mean" | fun=="MEAN"){
-    ex <- raster::extract(da, basin, fun=mean, na.rm=TRUE, df=df,weights=weight,normalizWeights=TRUE, small=TRUE)
+    ex <- raster::extract(da, basin, fun=mean, na.rm=TRUE, df=df,weights=weight)
   }else{
-    ex <- raster::extract(da, basin, fun=sum, na.rm=TRUE, df=df,normalizWeights=TRUE, small=TRUE)
+    ex <- raster::extract(da, basin, fun=sum, na.rm=TRUE, df=df)
   }
 
   if (df){
