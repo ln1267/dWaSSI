@@ -768,10 +768,11 @@ f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,start,sca
   require(reshape2)
   require(raster)
   da<-brick(ncfilename)
+  da<-crop(da,basin)
   NAvalue(da)<- 0
   if(plot) {
-    plot(da[[1]])
-    plot(basin,add=T)
+    print(plot(da[[1]],basin))
+    print(plot(basin,add=T))
   }
   if(fun=="mean" | fun=="Mean" | fun=="MEAN"){
     ex <- raster::extract(da, basin, fun=mean, na.rm=TRUE, df=df,weights=weight)
