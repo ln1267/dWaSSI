@@ -27,4 +27,3 @@ f_cal_WaSSI(lin, S_y, E_y, S_y_LAI, E_y_LAI, watershed = F, Q = NA,
 \description{
 Calculate WaSSI for each pixel function
 }
-

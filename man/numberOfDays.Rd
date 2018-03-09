@@ -17,4 +17,3 @@ date<-as.Date("2001-01-01")
 numberOfDays(date)
 }
 \keyword{cats}
-

@@ -7,4 +7,4 @@ Maintainer: Ning Liu <N.Liu@murdoch.eu.au>
 Description: This is a R version of dWaSSI-C model
 License: What license is it under?
 LazyData: TRUE
-RoxygenNote: 5.0.1
+RoxygenNote: 6.0.1

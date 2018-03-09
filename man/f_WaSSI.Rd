@@ -25,4 +25,3 @@ f_WaSSI(data_in, pars, soil_in, calibrate = NA, daily = F, y_s = NA,
 \description{
 Calculate Q with SMA-SMC and snow model
 }
-

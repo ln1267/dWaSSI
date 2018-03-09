@@ -35,3 +35,5 @@ numberOfDays <- function(date) {
 
   return(as.integer(format(date - 1, format="%d")))
 }
+
+

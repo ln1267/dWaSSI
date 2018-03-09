@@ -17,4 +17,3 @@ libs<-c("ggplot2","caTools")
 f_lib_check(libs)
 }
 \keyword{libraries}
-

@@ -717,3 +717,31 @@ sfreq <- function(x, min.year=1800) {
   return(out)
 
 }
+
+#' Transfering matrix/array to raster/brick
+#' @param data A matrix or array object.
+#' @param infonc A filename of a raster object for getting the raster extent info.
+#' @keywords cats
+#' @export
+#' @examples
+#' rc<-f_2raster(darray,infonc="/Dataset/backup/CABLE/ET_ann_82_14.nc")
+#'
+
+# This is for transfering array to raster
+f_2raster<-function(data,infonc=NA){
+  #infonc is a target raster
+  require(raster)
+  if(is.na(infonc)){
+    info<-raster("/Dataset/backup/CABLE/ET_ann_82_14.nc")
+  }else{
+    info<-raster(infonc)
+  }
+
+  if(is.matrix(data)){
+    .grid<-raster(data,xmn=info@extent@xmin,xmx=info@extent@xmax,ymn=info@extent@ymin,ymx=info@extent@ymax,crs=crs(info))
+
+  }else{
+    .grid<-brick(data,xmn=info@extent@xmin,xmx=info@extent@xmax,ymn=info@extent@ymin,ymx=info@extent@ymax,crs=crs(info))
+  }
+  return(.grid)
+}
