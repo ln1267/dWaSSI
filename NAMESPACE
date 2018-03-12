@@ -2,5 +2,6 @@
 
 export(f_2raster)
 export(f_lib_check)
+export(f_paste)
 export(f_sta_shp_nc)
 export(numberOfDays)
