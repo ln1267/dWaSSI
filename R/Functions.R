@@ -67,18 +67,26 @@ f_cut<-function(x){
 }
 
 
+#' Setup up parallel using FORK
+#' @param name A filename for storing parallel log.
+#' @param ncores How many cores will be used for parallelization
+#' @keywords Parallel
+#' @export
+#' @examples
+#' f_Parallel_set(name="zeus",ncores=10)
+#'
 
 # setup parallel in Magnus or Zeus
-f_Parallel_set<-function(name="zeus"){
+f_Parallel_set<-function(name="zeus",ncores=NA){
   if (name=="magnus"){
-    print("using Magnus for processing")
-    cl<<-makeCluster(40, type="FORK", outfile = "parallel_mag.txt")  # set up parallel
+    print("using input cores for processing")
+    cl<<-makeCluster(ncores, type="FORK", outfile = paste0("parallel_log",name,".txt"))  # set up parallel
     print(mem_used())#detectCores()-1
     print(detectCores())
 
   }else{
-    print("using Zeus for processing")
-    cl<<-makeCluster(detectCores()-1, type="FORK", outfile = "parallel_zeus.txt")  # set up parallel
+    print("using max-1 cores for processing")
+    cl<<-makeCluster(detectCores()-1, type="FORK", outfile = paste0("parallel_log",name,".txt"))   # set up parallel
     print(mem_used())#
     print(detectCores())
   }
