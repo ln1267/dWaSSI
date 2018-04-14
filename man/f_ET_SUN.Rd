@@ -14,3 +14,6 @@ f_ET_SUN(data_monthly_frame, pars)
 \description{
 Calculate PET of each pixel/watershed with monthly temperature data by using Hamon's PET formular and then calculate SUN_ET with monthly ET~f(P,LAI,PET)
 }
+\examples{
+PET<-f_ET_SUN(data_monthly_frame,pars)
+}

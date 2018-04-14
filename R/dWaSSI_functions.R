@@ -5,7 +5,9 @@
 #' Calculate PET of each pixel/watershed with monthly temperature data by using Hamon's PET formular and then calculate SUN_ET with monthly ET~f(P,LAI,PET)
 #' @param data_monthly this is the monthly dataframe data, which includes all main variabels (P,T,LAI, etc.)
 #' @param pars A names vector inlcudes "ALT","LAT","LONG",and "VEG" infomation
-
+#' @export
+#' @examples
+#' PET<-f_ET_SUN(data_monthly_frame,pars)
 
 # calculate PET in monthly with T
 f_ET_SUN<-function(data_monthly_frame,pars){
@@ -38,6 +40,10 @@ f_ET_SUN<-function(data_monthly_frame,pars){
 #' @param daily A logic object defined the scale of input data "default is daily=F monthly"
 #' @param scale Simulation scale c("month","ann")
 #' @param y_s,y_e The start and end year for simulation
+#' @export
+#' @examples
+#' WaS<-f_WaSSI(data_in,pars,soil_in,calibrate=NA,daily=F,y_s=NA,y_e=NA,scale="month")
+#'
 
 f_WaSSI<-function(data_in,pars,soil_in,calibrate=NA,daily=F,y_s=NA,y_e=NA,scale="month"){
 
@@ -278,7 +284,10 @@ f_WaSSI<-function(data_in,pars,soil_in,calibrate=NA,daily=F,y_s=NA,y_e=NA,scale=
 #' @param calibrate whether calibrate first
 #' @param y_s,y_e the simulate start and end year
 #' @param Q A dataframe of Q data with c["YEAR","Month","Q"]
-
+#' @export
+#' @examples
+#' WaS<-f_cal_WaSSI(lin,S_y,E_y,S_y_LAI,E_y_LAI,watershed=F,Q=NA,calibrate=NA,y_s=NA,y_e=NA)
+#'
 f_cal_WaSSI<-function(lin,S_y,E_y,S_y_LAI,E_y_LAI,watershed=F,Q=NA,calibrate=NA,y_s=NA,y_e=NA){
 
   Year_C<-rep(c(S_y:E_y), each=12)
