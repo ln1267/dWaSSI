@@ -877,6 +877,7 @@ f_paste<-function(x,y,sep=""){
 
 
 f_zonal_shp_nc<-function(ncfilename,shp,zonal_field,category=T){
+  require(raster)
   # Function for get the ratio of one polygon
   f_ratio<-function(extracts,levs,zonal_field){
     class_ratio<-data.frame("Levels"=levs,"Ratio"=NA)
@@ -893,7 +894,7 @@ f_zonal_shp_nc<-function(ncfilename,shp,zonal_field,category=T){
   extract_shps<-extract(brick_input,shp)
 
   # Get all categories
-  levs<-unique(brick_input)
+  levs<-raster::unique(brick_input)
   levs<-levs[!is.na(levs)]
 
   # Sta the ratio of each category for all polygons
