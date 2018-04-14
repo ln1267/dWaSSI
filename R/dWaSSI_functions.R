@@ -42,11 +42,26 @@ f_ET_SUN<-function(data_monthly_frame,pars){
 #' @param y_s,y_e The start and end year for simulation
 #' @export
 #' @examples
-#' WaS<-f_WaSSI(data_in,pars,soil_in,calibrate=NA,daily=F,y_s=NA,y_e=NA,scale="month")
+#' WaS<-f_WaSSI(data_in,pars,soil_in,calibrate=F,daily=F,y_s=NA,y_e=NA,scale="month")
 #'
 
-f_WaSSI<-function(data_in,pars,soil_in,calibrate=NA,daily=F,y_s=NA,y_e=NA,scale="month"){
+f_WaSSI<-function(data_in,
+                  pars,
+                  soil_in,
+                  calibrate=F,
+                  daily=F,
+                  y_s=NA,
+                  y_e=NA,
+                  scale="month"){
 
+  require(hydromad)
+  require(hydroTSM)
+  require(hydroGOF)
+  require(SPEI)
+  require(zoo)
+  ##############################################################################
+  # Prepare input data
+  ##############################################################################
   # if the input is a zoo
   if(is.zoo(data_in)){
     y_start<- as.Date(index(data_in)[1])
@@ -65,7 +80,7 @@ f_WaSSI<-function(data_in,pars,soil_in,calibrate=NA,daily=F,y_s=NA,y_e=NA,scale=
 
     # if input is daily data
     if(daily){
-    #print("Daily simulation")
+      #print("Daily simulation")
       data_daily<-data_in
 
     }else{
@@ -115,6 +130,9 @@ f_WaSSI<-function(data_in,pars,soil_in,calibrate=NA,daily=F,y_s=NA,y_e=NA,scale=
   }
   head(HydroTestData)
 
+  ##############################################################################
+  # Simulate snow
+  ##############################################################################
   ##  Simulate snow
 
   # print default parameters for snowmelt calculation
@@ -138,6 +156,10 @@ f_WaSSI<-function(data_in,pars,soil_in,calibrate=NA,daily=F,y_s=NA,y_e=NA,scale=
   HydroTestData[,"P"]<-snow_out[,"U"]
   names(HydroTestData)[c(which(names(HydroTestData)=="E0"),which(names(HydroTestData)=="E"))]<-c("E","T")
 
+  ##############################################################################
+  # Simulate Q and AET based on SMA-SMC
+  ##############################################################################
+
   # calculate Q and actual ET based on SMA-SAC
 
   # define simulation time period
@@ -148,7 +170,7 @@ f_WaSSI<-function(data_in,pars,soil_in,calibrate=NA,daily=F,y_s=NA,y_e=NA,scale=
   index_sim<-which(index(HydroTestData)<= as.POSIXct(y_end_sim) & index(HydroTestData)>= as.POSIXct(y_start_sim) )
 
   ## if Q exist ### Fit SAM-SAC model soil parameters based on “Hydromad” fiting function in Watershed scale with Q validation data
-  if (! is.na(calibrate) & length(which(names(HydroTestData)=="Q"))>0){
+  if (calibrate & length(which(names(HydroTestData)=="Q"))>0){
 
     print("calibration")
     ## an unfitted model, with ranges of possible parameter values
@@ -161,10 +183,11 @@ f_WaSSI<-function(data_in,pars,soil_in,calibrate=NA,daily=F,y_s=NA,y_e=NA,scale=
     print(summary(fitx))
     print("NSE=")
     print(NSE(fitx$data[,"Q"],fitx$U[,"U"]))
-
+    fitx$fit.result$NSE=NSE(fitx$data[,"Q"],fitx$U[,"U"])
     # plot fitted result with P
-    xyplot(fitx, with.P = TRUE, type = c("l", "g"))
-
+    # pdf(paste("images/Calibration_",name,".pdf",sep=""))
+    # xyplot(fitx, with.P = TRUE, type = c("l", "g"))
+    # dev.off()
     # transfer soil input
     soil_pars<-list("uztwm" = 1, "uzfwm" = 150, "uzk" = 0.1, "pctim" = 1e-06, "adimp" = 0,
                     "zperc" = 28.8997, "rexp" = 5, "lztwm" = 205.652, "lzfsm" = 758.774,
@@ -200,74 +223,92 @@ f_WaSSI<-function(data_in,pars,soil_in,calibrate=NA,daily=F,y_s=NA,y_e=NA,scale=
     # print(head(out) )
   }
 
+  ##############################################################################
+  # Merge simulated result
+  ##############################################################################
+
   # merge all data
   snow_out_al<-snow_out[index_sim,]
   out_result<-merge(snow_out_al,out)
   #print(head(out_result) )
   #print(summary(out_result))
 
-  # output result
-  if( scale=="MONTH" | scale=="month" ){
+  ##############################################################################
+  # Tansfer daily data to monthly or annual
+  ##############################################################################
 
-    # input data
-    if(daily){
+  # input data
+  if(daily){
 
-      index_in<-which(index(data_in_all)<= as.POSIXct(y_end_sim) & index(data_in_all)>= as.POSIXct(y_start_sim) )
-      data_in_all<-data_in_all[index_in,]
-      # index_T<-which(names(data_in_all) %in% c("T","Tmin","Tmax"))
-      # index_NT<-which(! names(data_in_all) %in% c("T","Tmin","Tmax"))
-      #
-      # Water_mon<-daily2monthly(data_in_all[,index_NT],FUN=sum,na.rm = T)
-      # Temp_mon<-daily2monthly(data_in_all[,index_T],FUN=mean,na.rm = T)
-      # HydroTestData_mon<-cbind(Water_mon,Temp_mon)
-      out_result<-merge(data_in_all,out_result)
-      result_mon<-daily2monthly(out_result,FUN = sum,na.rm = T,out.fmt = "%Y-%m-%d")
-      summary(result_mon)
-      head(result_mon)
-      result_mon
-    }else{
-      result_mon<-daily2monthly(out_result,FUN = sum,na.rm = T,out.fmt = "%Y-%m-%d")
+    index_in<-which(index(data_in_all)<= as.POSIXct(y_end_sim) & index(data_in_all)>= as.POSIXct(y_start_sim) )
+    data_in_all<-data_in_all[index_in,]
+    # index_T<-which(names(data_in_all) %in% c("T","Tmin","Tmax"))
+    # index_NT<-which(! names(data_in_all) %in% c("T","Tmin","Tmax"))
+    #
+    # Water_mon<-daily2monthly(data_in_all[,index_NT],FUN=sum,na.rm = T)
+    # Temp_mon<-daily2monthly(data_in_all[,index_T],FUN=mean,na.rm = T)
+    # HydroTestData_mon<-cbind(Water_mon,Temp_mon)
+    result_daily<-merge(data_in_all,out_result)
+    result_mon<-daily2monthly(result_daily,FUN = sum,na.rm = T,out.fmt = "%Y-%m-%d")
 
-      #timeseq_month
-      index_in<-which(index(data_in_all)<= as.POSIXct(y_end_sim) & index(data_in_all)>= as.POSIXct(y_start_sim) )
-      data_in_all<-data_in_all[index_in,]
-      # index_T<-which(names(data_in_all) %in% c("T","Tmin","Tmax"))
-      # index_NT<-which(! names(data_in_all) %in% c("T","Tmin","Tmax"))
-      #
-      # Water_mon<-daily2monthly(data_in_all[,index_NT],FUN=sum,na.rm = T)
-      # Temp_mon<-daily2monthly(data_in_all[,index_T],FUN=mean,na.rm = T)
-      # HydroTestData_mon<-cbind(Water_mon,Temp_mon)
-      index(result_mon)<-index(data_in_all)
-      result_mon<-merge(data_in_all,result_mon)
-
-      # calculate GEP based on AET and WUE
-      GEP<-result_mon[,"AET"] * pars["WUE"]
-      # calculate RE based on relationship between RE and ET for vegetation types
-      ER<-result_mon[,"AET"]*pars["ER_m"]+pars["ER_n"]
-
-      # merge carbon variables
-      result_mon<-merge(result_mon,GEP,ER)
-
-      summary(result_mon)
-      head(result_mon)
-      result_mon
-    }
-  }else if(scale=="ANN" | scale=="ann"){
-    result_ann<-daily2annual(out_result,FUN = sum,na.rm = T)
-
-    # calculate GEP based on AET and WUE
-    GEP<-result_ann[,"AET"] * pars["WUE"]
-    # calculate RE based on relationship between RE and ET for vegetation types
-    ER<-result_ann[,"AET"]*pars["ER_m"]+pars["ER_n"]
-
-    # merge carbon variables
-    result_ann<-merge(result_ann,GEP,ER)
-
-    summary(result_ann)
-    head(result_ann)
-    result_ann
   }else{
-    out_result
+
+    result_mon<-daily2monthly(out_result,FUN = sum,na.rm = T,out.fmt = "%Y-%m-%d")
+    #timeseq_month
+    index_in<-which(index(data_in_all)<= as.POSIXct(y_end_sim) & index(data_in_all)>= as.POSIXct(y_start_sim) )
+    data_in_all<-data_in_all[index_in,]
+    # index_T<-which(names(data_in_all) %in% c("T","Tmin","Tmax"))
+    # index_NT<-which(! names(data_in_all) %in% c("T","Tmin","Tmax"))
+    #
+    # Water_mon<-daily2monthly(data_in_all[,index_NT],FUN=sum,na.rm = T)
+    # Temp_mon<-daily2monthly(data_in_all[,index_T],FUN=mean,na.rm = T)
+    # HydroTestData_mon<-cbind(Water_mon,Temp_mon)
+    index(result_mon)<-index(data_in_all)
+    result_mon<-merge(data_in_all,result_mon)
+  }
+
+  # calculate GEP based on AET and WUE
+  GEP<-as.numeric(result_mon[,"AET"])* pars["WUE"]
+  # calculate RE based on relationship between RE and ET for vegetation types
+  ER<-as.numeric(result_mon[,"AET"])*pars["ER_m"]+pars["ER_n"]
+  GEP<-as.zooreg(zoo(GEP, order.by = index(result_mon)))
+  ER<-as.zooreg(zoo(ER, order.by = index(result_mon)))
+  # merge carbon variables
+  result_mon<-merge(result_mon,GEP,ER)
+
+  summary(result_mon)
+
+
+  ##############################################################################
+  # Output result
+  ##############################################################################
+  if (calibrate & length(which(names(HydroTestData)=="Q"))>0){
+    if( scale=="MONTH" | scale=="month" ){
+
+      list("Result"=result_mon,"Fit"=fitx)
+
+    }else if(scale=="ANN" | scale=="ann" | scale=="annual" | scale=="ANNUAL"| scale=="Annual"){
+
+      result_ann<-monthly2annual(result_mon,FUN = sum,na.rm = T)
+      list("Result"=result_ann,"Fit"=fitx)
+    }else{
+      result_daily
+      list("Result"=result_daily,"Fit"=fitx)
+    }
+
+  }else{
+
+    if( scale=="MONTH" | scale=="month" ){
+
+      result_mon
+
+    }else if(scale=="ANN" | scale=="ann" | scale=="annual" | scale=="ANNUAL"| scale=="Annual"){
+
+      result_ann<-monthly2annual(result_mon,FUN = sum,na.rm = T)
+      result_ann
+    }else{
+      result_daily
+    }
   }
 }
 
