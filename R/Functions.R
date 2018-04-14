@@ -863,3 +863,42 @@ f_paste<-function(x,y,sep=""){
     }
   }
 }
+
+#' Zonal catergory raster file based on shp
+#' @param ncfilename The input nc file.
+#' @param shp The input polygon.
+#' @param zonal_field elect the field from shapefile file for naming the result
+#' @keywords zonal
+#' @export
+#' @examples
+#' zonal_shp<-f_zonal_shp_nc(ncfilename="/Dataset/backup/CABLE/ET_ann_82_14.nc",
+#' basin,,zonal_field="Station")
+#'
+
+
+f_zonal_shp_nc<-function(ncfilename,shp,zonal_field,category=T){
+  # Function for get the ratio of one polygon
+  f_ratio<-function(extracts,levs,zonal_field){
+    class_ratio<-data.frame("Levels"=levs,"Ratio"=NA)
+    a<-extracts %>%
+      table()  %>%
+      as.data.frame()
+    a$Levels<-as.integer(as.character(a$.))
+    class_ratio<-merge(class_ratio,a[-1],all.x=T)
+    class_ratio$Ratio<-round(class_ratio$Freq/sum(class_ratio$Freq,na.rm = T),2)
+    class_ratio
+  }
+    # read the raster file
+  brick_input<-raster(ncfilename)
+  extract_shps<-extract(brick_input,shp)
+
+  # Get all categories
+  levs<-unique(brick_input)
+  levs<-levs[!is.na(levs)]
+
+  # Sta the ratio of each category for all polygons
+  .aa<-lapply(extract_shps,f_ratio,levs=levs)
+  .ab<-do.call(rbind,.aa)
+  .ab[zonal_field]<-rep(as.character(shp[[zonal_field]]),each=length(levs))
+  .ab
+}
