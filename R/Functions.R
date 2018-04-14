@@ -878,6 +878,7 @@ f_paste<-function(x,y,sep=""){
 
 f_zonal_shp_nc<-function(ncfilename,shp,zonal_field,category=T){
   require(raster)
+  require(dplyr)
   # Function for get the ratio of one polygon
   f_ratio<-function(extracts,levs,zonal_field){
     class_ratio<-data.frame("Levels"=levs,"Ratio"=NA)
