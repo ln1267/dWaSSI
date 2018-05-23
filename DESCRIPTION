@@ -1,7 +1,7 @@
 Package: dWaSSI
 Type: Package
 Title: This is a package including functions for dWaSSI-C model
-Version: 0.1.1
+Version: 0.1.2
 Author: Ning Liu
 Maintainer: Ning Liu<N.Liu@murdoch.eu.au>
 Description: This is a R version of dWaSSI-C model and some functions for spatial data process

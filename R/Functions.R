@@ -1,8 +1,6 @@
-##################################################
-
 # This file includs all functions used for studying the relationship between VEG and PRE in AU
 
-###---------list of functions
+# List of functions----
 # f_lib_check(libs) ##libs is a vector of required libraries
 #	f_parallel(data=null, fun=null, type="parallel")		for setting up parallel methods
 #f_cor(x,y) ## Calculate the correlationship between two vectors ("x" and "y") and return ("r" and "p")
@@ -12,11 +10,8 @@
 #	f_plot<-function(data,info,annual=FALSE,monthly=FALSE) for monthly or annual grid data plot
 #	f_grid2basin(data,type="annual",fun="mean")	#Transfer grid frame data to basin data by fun="mean"
 
-##################################################
 
-
-#' A requied libraries Load and check Function
-#'
+## Function for load multiple libraries----
 #' This function allows you to check whether the required library has been installed, otherwise it will be installed and load.
 #' @param libs A character vector of names of required libraries.
 #' @keywords libraries
@@ -24,8 +19,6 @@
 #' @examples
 #' libs<-c("ggplot2","caTools")
 #' f_lib_check(libs)
-
-# Load and check libraries
 f_lib_check<-function(libs){
   for (lib in libs ){
     if(lib %in% rownames(installed.packages())){
@@ -39,10 +32,8 @@ f_lib_check<-function(libs){
 }
 
 
-# TRIM THE ANOMALIES FOR A VARIABLE
+## Trim the anomaly for a variable----
 ### treat +0.5% and -0.5% value as anomaly
-##########################################################
-
 cutAnomalies <- function(x){
   # Cut the anomolies
   toPlot <- c(x)
@@ -66,7 +57,7 @@ f_cut<-function(x){
   x
 }
 
-
+## Setup parallel with multiple cors----
 #' Setup up parallel using FORK
 #' @param name A filename for storing parallel log.
 #' @param ncores How many cores will be used for parallelization
@@ -75,9 +66,9 @@ f_cut<-function(x){
 #' @examples
 #' f_Parallel_set(name="zeus",ncores=10)
 #'
-
-# setup parallel in Magnus or Zeus
 f_Parallel_set<-function(name="zeus",ncores=NA){
+  library(pryr)
+  library(parallel)
   if (name=="magnus"){
     print("using input cores for processing")
     cl<<-makeCluster(ncores, type="FORK", outfile = paste0("parallel_log",name,".txt"))  # set up parallel
@@ -92,7 +83,7 @@ f_Parallel_set<-function(name="zeus",ncores=NA){
   }
 }
 
-# this plot theme is for ggplot
+## Plot theme is for ggplot----
 theme_grid <- function(base_size = 12, base_family = "Times"){
   theme_bw(base_size = base_size, base_family = base_family) %+replace%
     theme(
@@ -244,11 +235,26 @@ f_SAI<-function(data=data,method="SAI",mask=NA,plot=F,anom_ab=5){
   return(list(MEAN=data_mean,ANOM=anom))
 }
 
+## Correlationship between two vectors----
+#' Calculate the correlation coefficient between two vectors
+#' @param da The input is a vector, which is combination of c(x,y)
+#' @param method One of "pearson", "kendall", or "spearman", can be abbreviated.
+#' @keywords correlationship
+#' @export
+#' @examples
+#' x<-c(1:10);y<-c(1:10)
+#' damerge<-c(x,y)
+#' f_cor(da=damerge,method="spearman")
+#'
+## Calculate the correlation coefficient between two vectors ("x" and "y") and return ("r" and "p")
+f_cor<-function(da,method="spearman") {
+  y_e<-length(da)
+  x_e<-y_e/2
+  y_s<-x_e+1
+  x<-da[1:x_e];y<-da[y_s:y_e]
 
-## Calculate the correlationship between two vectors ("x" and "y") and return ("r" and "p")
-f_cor <- function(x,y) {
+  res <- try(cor.test(x,y,method =method), silent=TRUE)
 
-  res <- try(cor.test(x,y ), silent=TRUE)
   if (class(res)=="try-error") {
     res <- setNames(c(NA, NA), c("estimate","p.value"))
 
@@ -256,102 +262,70 @@ f_cor <- function(x,y) {
     .res<-unclass(res)[c("estimate","p.value")]
     res<-unlist(.res)
   }
-  return(res)
+  res
+}
+
+## Trend using lm (f_trend)----
+#' Trend analysis using linear regression
+#' @param da The input vector
+#' @keywords trend
+#' @export
+#' @examples
+#' x<-c(1:10)
+#' f_trend(data=x)
+f_trend<-function(data){
+  if(sum(is.na(data))>0 | sum(is.infinite(data))>0){
+    c(NA,NA,NA)
+  }else{
+    .lm<-lm(data~c(1:length(data)))
+    a<-summary(.lm)
+    #a$coefficients
+    c(a$r.squared,a$coefficients[2,4],a$coefficients[2,1])
+  }
 }
 
 
-## setup parallel for "parallel" or "doParallel" or "foreach" or "snow"
+## Monthly Array to annual (f_mon2annual_array)----
+#' Convert a monthly array to a annual array
+#' @param da The input monthly array
+#' @param fun The function for aggregation: "mean", "sum"
+#' @keywords trend
+#' @export
+#' @examples
+#' da<-array(c(1:288),c(4,3,24))
+#' f_mon2annual_array(da=da,fun="mean")
 
-f_parallel<-function(data=null, fun=null, type="parallel"){
+f_mon2annual_array<-function(da,fun="mean"){
+  dims<-dim(da)
+  da_ann<-array(0,c(dims[1],dims[2],dims[3]/12))
 
-  if (type=="parallel"){
+  a<-1
+  b<-1
+  for (y in c(1:(dims[3]/12))){
 
-    library(parallel)
-    print("using parallel package to simulate")
-    print(paste("Num of Cores=", detectCores()))
+    linshi<-matrix(0,ncol=dims[2],nrow=dims[1])
 
-    ## set up parallel type to "FORK", all cluster share the global variables
-    cl<-makeCluster(detectCores()-1, type="FORK")
+    for (m in 1:12){
 
-  }else if (type=="doParallel"){
-
-    library(doParallel)
-    print("using doParallel package to simulate")
-    print(paste("Num of Cores=", detectCores()))
-
-    cl<-makeCluster(detectCores()-1, type="FORK")  # set up parallel
-    clusterEvalQ(cl, library(rms)) # load required packages "rms"
-
-    print(mem_used())
-    #	cl<-makeCluster(detectCores()-1)  # set up parallel
-    print(detectCores())
-    #	clusterExport(cl,c("x"))    # share default data for all threads
-
-  }else if (type=="foreach"){
-
-    library(foreach)
-    library(doParallel)
-    print("using foreach package to simulate")
-
-    cl<-makeCluster(detectCores()-1,outfile = "foreach_debug.txt")  # set up parallel
-    registerDoParallel(cl)
-
-    foreach(exponent = 2:4,
-            .combine = c,
-            .export = "base",
-            .packages = c("rms", "mice")
-    )  %dopar%  {
-      tryCatch({
-        c(1/x, x, 2^x)
-      }, error = function(e) return(paste0("The variable '", x, "'", " caused the error: '", e, "'")))
+      linshi<-linshi+da[,,a]
+      #print(range(linshi,na.rm=T))
+      a<-a+1
     }
 
-    stopCluster(cl)
+    if( fun == "mean"){
 
-  }else if (type=="snow"){
+      da_ann[,,y]<-linshi/12
+    }else{
+      da_ann[,,y]<-linshi
+    }
 
-
-
-  }else if (type=="snow"){
-
-    print("using snow package to simulate")
-
-    lnxOptions <-list(host = "itasca", rscript = "/group/director1234/software/zeus/apps/gcc/4.8.3/r/3.2.3/lib64/R/bin/Rscript", snowlib = "/home/nliu/R/x86_64-pc-linux-gnu-library/3.2")
-    cl <- makeCluster(c( rep(list(lnxOptions), 2)), type = "SOCK")
-    x<-NDVI_mon_82_13$NDVI
-
-    nc<-length(cls)
-
-    clusterExport(cl,c("x"))    # share default data for all threads
-
-    system.time(
-      STA<-parLapply(cl,seq(1,564400),f_dp,data=x,year_start=1982,year_end=2013) # using parLapply to simulate data in parallel way
-    )
-    ## combin general returned data
-    STA<-do.call(rbind,STA)
-    save(STA,file="STA.RData")
-    stopCluster(cl)
-
-  }else{
-    print("using snowfall and ff package to simulate")
-    x<-as.ffdf(NDVI_mon_82_13)
-    cores<-detectCores()-1
-    sfInit(parallel=TRUE, cpus=cores, type="SOCK")
-    sfLibrary(ff)
-    sfLibrary(bfast)
-    sfLibrary(trend)
-    sfExport("x")
-    sfClusterSetupRNG()
-    #system.time(ls<-sfLapply(1:564400, f_change,data=x,year_start=1982,year_end=2013,variable="NDVI"))
-    system.time(ls<-sfLapply(1:564400, f_mk,data=x,year_start=1982,year_end=2013,variable="NDVI"))
-    la<-do.call("rbind",ls)
-    save(la,file="mk.RData")
-    sfStop()
+    b<-b+1
+    print(y)
   }
-
-
-
+  print(range(da_ann,na.rm=T))
+  return(da_ann)
 }
+
 
 ##Transfer monthly frame data to annual data by fun="sum" ot "mean"
 f_m2y<-function(data, fun="mean"){
@@ -397,7 +371,8 @@ f_summary<-function(){
 
 }
 
-## summary funtion which can output summary information for all list objects in memory
+## Summary funtion for lists----
+### which can output summary information for all list objects in memory
 f_list_summary<-function(){
   print("print info for all list objects")
   a<-ls(envir=.GlobalEnv)
@@ -617,7 +592,13 @@ f_box_plot<-function(name1){
   #print(g_plot)
 }
 
-###   plot annual mean line
+## Plot annual mean line----
+#' Plot annual mean line
+#' @param ... ggplot plots.
+#' @param cols Number of columns
+#' @examples
+#' multiplot(p1,p2,p3,p4,cols=2)
+#'
 f_line_plot<-function(name1){
   r<-coef(lm(mean_ann_MJ_Y[[a]] ~ YEAR, data = mean_ann_MJ_Y))
   print(r[2])
@@ -629,11 +610,14 @@ f_line_plot<-function(name1){
   print(names(mean_ann_MJ_Y)[a])
 }
 
+## Function for ggplot multiple plot----
+#' multiplot for ploting multi row and cols ggplot function
+#' @param ... ggplot plots.
+#' @param cols Number of columns
+#' @examples
+#' multiplot(p1,p2,p3,p4,cols=2)
+#'
 
-#################################################
-#multiplot for ploting multi row and cols ggplot function
-
-################################################
 multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
   require(grid)
 
@@ -661,9 +645,33 @@ multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
     }
   }
 }
-# convert daily data to annual (zoo)
-daily2annual<-function (x, FUN, na.rm = TRUE, out.fmt = "%Y-%m-%d", ...)
+
+## convert daily data to annual (zoo)----
+#' Convert daily data to annual (zoo)----
+#' @param x Input zoo variable.
+#' @param FUN function for aggregation
+#' @keywords aggregation
+#' @export
+#' @examples
+#' daily2annual( FUN=mean)
+#'
+daily2annual<-function (x, FUN, na.rm = TRUE, out.fmt = "%Y-%m-%d")
 {
+  sfreq <- function(x, min.year=1800) {
+
+    # Checking that 'class(x)'
+    valid.class <- c("xts", "zoo")
+    if (length(which(!is.na(match(class(x), valid.class )))) <= 0)
+      stop("Invalid argument: 'x' must be in c('xts', 'zoo')" )
+
+    out <- periodicity(x)$scale # xts::periodicity
+
+    if (out == "yearly") out <- "annual"
+
+    return(out)
+
+  }
+
   if (missing(FUN))
     stop("Missing argument value: 'FUN' must contain a valid function for aggregating the values")
   if (sfreq(x) %in% c("annual"))
@@ -689,9 +697,31 @@ daily2annual<-function (x, FUN, na.rm = TRUE, out.fmt = "%Y-%m-%d", ...)
   return(tmp)
 }
 
-# convert daily data to monthly (zoo)
+# Convert daily data to monthly (zoo)----
+#' Convert daily data to monthly (zoo)----
+#' @param x Input zoo variable.
+#' @param FUN function for aggregation
+#' @keywords aggregation
+#' @export
+#' @examples
+#' daily2monthly( FUN=mean)
+#'
 daily2monthly<-function (x, FUN, na.rm = TRUE, ...)
 {
+  sfreq <- function(x, min.year=1800) {
+
+  # Checking that 'class(x)'
+  valid.class <- c("xts", "zoo")
+  if (length(which(!is.na(match(class(x), valid.class )))) <= 0)
+    stop("Invalid argument: 'x' must be in c('xts', 'zoo')" )
+
+  out <- periodicity(x)$scale # xts::periodicity
+
+  if (out == "yearly") out <- "annual"
+
+  return(out)
+
+    }
   if (missing(FUN))
     stop("Missing argument value: 'FUN' must contain a valid function for aggregating the values")
   if (sfreq(x) %in% c("monthly", "quarterly", "annual"))
@@ -711,21 +741,8 @@ daily2monthly<-function (x, FUN, na.rm = TRUE, ...)
   return(tmp)
 }
 
-sfreq <- function(x, min.year=1800) {
 
-  # Checking that 'class(x)'
-  valid.class <- c("xts", "zoo")
-  if (length(which(!is.na(match(class(x), valid.class )))) <= 0)
-    stop("Invalid argument: 'x' must be in c('xts', 'zoo')" )
-
-  out <- periodicity(x)$scale # xts::periodicity
-
-  if (out == "yearly") out <- "annual"
-
-  return(out)
-
-}
-
+## Convert array to raster----
 #' Transfering matrix/array to raster/brick
 #' @param data A matrix or array object.
 #' @param infonc A filename of a raster object for getting the raster extent info.
@@ -733,9 +750,6 @@ sfreq <- function(x, min.year=1800) {
 #' @export
 #' @examples
 #' rc<-f_2raster(darray,infonc="/Dataset/backup/CABLE/ET_ann_82_14.nc")
-#'
-
-# This is for transfering array to raster
 f_2raster<-function(data,infonc=NA){
   #infonc is a target raster
   require(raster)
@@ -754,6 +768,7 @@ f_2raster<-function(data,infonc=NA){
   return(.grid)
 }
 
+## Zonal raster or brick file----
 #' Zonal raster/brick based on a shapefile
 #' @param ncfilename A filename for a "raster*" type object.
 #' @param basin A ploygon object.
@@ -769,9 +784,6 @@ f_2raster<-function(data,infonc=NA){
 #' sta_shp<-f_sta_shp_nc(ncfilename="/Dataset/backup/CABLE/ET_ann_82_14.nc",
 #' basin,fun="mean",varname="ET",zonal_field="Station",start=1982,scale="annual")
 #'
-
-# zonal brick
-
 f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,start,scale="month",df=T,weight=T,plot=T){
   require(reshape2)
   require(raster)
@@ -835,7 +847,7 @@ f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,start,sca
   sta_catchment
 }
 
-
+## Paste one to one for two vectors, matrixes or arrays----
 #' Paste by value one to one for two vectors, matrixes or arrays
 #' @param x The first object, which can be vector, matrix or array.
 #' @param y The second object, which can be vector, matrix or array.
@@ -846,10 +858,6 @@ f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,start,sca
 #' x<-c(1,2,3)
 #' y<-c("A","B","C")
 #' f_paste(x,y,sep="-")
-#'
-
-# paste two vectors
-
 f_paste<-function(x,y,sep=""){
   dimx<-dim(x)
   if(is.null(dimx)){
@@ -864,6 +872,7 @@ f_paste<-function(x,y,sep=""){
   }
 }
 
+## Zonal catergory raster file based on shp----
 #' Zonal catergory raster file based on shp
 #' @param ncfilename The input nc file.
 #' @param shp The input polygon.
@@ -873,9 +882,6 @@ f_paste<-function(x,y,sep=""){
 #' @examples
 #' zonal_shp<-f_zonal_shp_nc(ncfilename="/Dataset/backup/CABLE/ET_ann_82_14.nc",
 #' basin,,zonal_field="Station")
-#'
-
-
 f_zonal_shp_nc<-function(ncfilename,shp,zonal_field,category=T){
   require(raster)
   require(dplyr)

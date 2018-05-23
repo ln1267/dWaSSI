@@ -4,12 +4,12 @@
 \alias{f_ET_SUN}
 \title{A SUN_ET function}
 \usage{
-f_ET_SUN(data_monthly_frame, pars)
+f_ET_SUN(data_monthly, pars)
 }
 \arguments{
-\item{pars}{A names vector inlcudes "ALT","LAT","LONG",and "VEG" infomation}
-
 \item{data_monthly}{this is the monthly dataframe data, which includes all main variabels (P,T,LAI, etc.)}
+
+\item{pars}{A names vector inlcudes "ALT","LAT","LONG",and "VEG" infomation}
 }
 \description{
 Calculate PET of each pixel/watershed with monthly temperature data by using Hamon's PET formular and then calculate SUN_ET with monthly ET~f(P,LAI,PET)

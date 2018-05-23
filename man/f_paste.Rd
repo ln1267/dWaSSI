@@ -20,6 +20,5 @@ Paste by value one to one for two vectors, matrixes or arrays
 x<-c(1,2,3)
 y<-c("A","B","C")
 f_paste(x,y,sep="-")
-
 }
 \keyword{paste}

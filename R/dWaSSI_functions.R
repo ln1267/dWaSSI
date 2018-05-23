@@ -9,25 +9,33 @@
 #' @examples
 #' PET<-f_ET_SUN(data_monthly_frame,pars)
 
-# calculate PET in monthly with T
-f_ET_SUN<-function(data_monthly_frame,pars){
-  y_start<-paste(min(data_monthly_frame$YEAR),"-01-01",sep="")
-  y_end<-paste(max(data_monthly_frame$YEAR),"-12-31",sep="")
+f_ET_SUN<-function(data_monthly,pars){
+  ## Hamon's PET ----
+  # calculate PET in monthly with T
+  f_Hamon<-function (par=1.2, tavg, lat, jday)
+  {
+    var_theta <- 0.2163108 + 2 * atan(0.9671396 * tan(0.0086 *
+                                                        (jday - 186)))
+    var_pi <- asin(0.39795 * cos(var_theta))
+    daylighthr <- 24 - 24/pi * acos((sin(0.8333 * pi/180) + sin(lat *
+                                                                  pi/180) * sin(var_pi))/(cos(lat * pi/180) * cos(var_pi)))
+    esat <- 0.611 * exp(17.27 * tavg/(237.3 + tavg))
+    return(par * 29.8 * daylighthr * (esat/(tavg + 273.2)))
+  }
   # monthly time seqeue
-  timeseq_mon <- seq(as.POSIXct(y_start, tz = "GMT"),as.POSIXct(y_end, tz = "GMT"),by = "month")
-
-  days<-sapply(timeseq_mon,function(x) numberOfDays(as.Date(x)))
-
+  data_daily<-month2daily(data_monthly,ts = T)
+  data_daily$Jday<-as.numeric(format(index(data_daily), "%j"))
   #calculate PET with Hamon's PET formular
-  MJD<-rep(c(15,46,76,107,137,168,198,229,259,290,321,351),length(days)/12)
-
-  data_monthly_frame$PET <- days*0.1651*1.2*216.7*6.108*exp(17.27*data_monthly_frame$T/(data_monthly_frame$T+237.3))/(data_monthly_frame$T+237.3)*2*acos(-1*tan(pars["LAT"]*.0174529)*tan(0.4093*sin(2*3.1415*MJD/365.-1.405)))/3.1415
+  data_daily$PET<-f_Hamon(tavg=data_daily$T,lat=pars["LAT"],jday = data_daily$Jday)
+  data_mon<-daily2monthly(data_daily,FUN = sum)
+  data_monthly$PET <- data_mon$PET
 
   # calculate ET based on SUN GE's ET and LAI, PET relationship
-  data_monthly_frame$E <- -4.79 + 0.75*data_monthly_frame$PET + 3.29*data_monthly_frame$LAI+0.04*data_monthly_frame$P
+  data_monthly$E <- -4.79 + 0.75*data_monthly$PET + 3.29*data_monthly$LAI+0.04*data_monthly$P
 
-  data_monthly_frame
+  data_monthly
 }
+
 
 
 #' A f_WaSSI function
@@ -131,7 +139,7 @@ f_WaSSI<-function(data_in,
   head(HydroTestData)
 
   ##############################################################################
-  # Simulate snow
+  # Simulate snow----
   ##############################################################################
   ##  Simulate snow
 

@@ -16,6 +16,5 @@ Transfering matrix/array to raster/brick
 }
 \examples{
 rc<-f_2raster(darray,infonc="/Dataset/backup/CABLE/ET_ann_82_14.nc")
-
 }
 \keyword{cats}

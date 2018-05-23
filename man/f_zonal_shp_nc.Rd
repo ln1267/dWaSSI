@@ -19,6 +19,5 @@ Zonal catergory raster file based on shp
 \examples{
 zonal_shp<-f_zonal_shp_nc(ncfilename="/Dataset/backup/CABLE/ET_ann_82_14.nc",
 basin,,zonal_field="Station")
-
 }
 \keyword{zonal}

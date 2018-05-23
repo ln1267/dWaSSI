@@ -2,7 +2,7 @@
 % Please edit documentation in R/Functions.R
 \name{f_lib_check}
 \alias{f_lib_check}
-\title{A requied libraries Load and check Function}
+\title{This function allows you to check whether the required library has been installed, otherwise it will be installed and load.}
 \usage{
 f_lib_check(libs)
 }
