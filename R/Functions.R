@@ -910,3 +910,53 @@ f_zonal_shp_nc<-function(ncfilename,shp,zonal_field,category=T){
   .ab[zonal_field]<-rep(as.character(shp[[zonal_field]]),each=length(levs))
   .ab
 }
+
+
+## Plot spatial data----
+#' Plot spatial data with overlap shpfile
+#' @param da The input nc file.
+#' @param filename The input polygon.
+#' @param colstyle "RdYlGn",
+#' @param varnames This is the var names for the plot variable
+#' @param pretty Logic
+#' @param margin list or logic. This is the Statistic information for the data showed on the margin
+#' @param shpname It can be any sting if a shp will be ploted
+#' @param cuts This is how many segments of the plot
+#' @param ranges This is the min and max of the data
+#' @param width This is the width of the pdf in "inch"
+#' @param height This is the height of the pdf in "inch"
+#' @keywords plot spatial
+#' @export
+#' @examples
+#' # the shpfile has to be loaded before the plot
+#' library(maptools)
+#' shp<-readShapeLines("data/shp/AU_STATES.shp")
+#' f_plot_sp(da = WTD,
+#'        filename = "/Dataset/www/images/WUE_AU/tt1.pdf",
+#'        width=7,height=7,
+#'        cuts = 10,
+#'        ranges = c(3,100),
+#'        shpname = "shp")
+f_plot_sp<-function(da,filename,colstyle="RdYlGn",pretty=T,margin=list(),shpname=NA,varnames=NA,cuts=NA,ranges=NA,width=7,height=7){
+  library(rasterVis)
+  library(RColorBrewer)
+  if(!is.na(varnames)) names(da)<-varnames
+  if(!is.na(ranges)){
+    da[da>=ranges[2]]<-ranges[2]
+    da[da<=ranges[1]]<-ranges[1]
+    zlim<-ranges
+  }else{
+    zlim<-c(min(cellStats(da,min)),max(cellStats(da,max)))
+  }
+
+  if(!is.na(cuts)) n<-cuts else n<-5
+
+  pdf(filename,width = width,height = height,family = "Times")
+  p1<-levelplot(da,par.settings=RdBuTheme(region=brewer.pal(n,colstyle)),margin=margin,pretty=pretty,cuts = n,at=seq(zlim[1],zlim[2],length.out = n+1))
+
+  if(!is.na(shpname))   {
+    p1<-p1+ layer(sp.lines(shp, col="gray", lwd=0.5))
+  }
+  print(p1)
+  dev.off()
+}
