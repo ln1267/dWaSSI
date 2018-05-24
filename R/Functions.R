@@ -926,7 +926,6 @@ f_zonal_shp_nc<-function(ncfilename,shp,zonal_field,category=T){
 #' @param width This is the width of the pdf in "inch"
 #' @param height This is the height of the pdf in "inch"
 #' @keywords plot spatial
-#' @export
 #' @examples
 #' # the shpfile has to be loaded before the plot
 #' library(maptools)
