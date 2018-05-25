@@ -2,6 +2,7 @@
 
 export(daily2annual)
 export(daily2monthly)
+export(f_2nc)
 export(f_2raster)
 export(f_ET_SUN)
 export(f_Parallel_set)

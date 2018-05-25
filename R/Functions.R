@@ -710,18 +710,18 @@ daily2monthly<-function (x, FUN, na.rm = TRUE, ...)
 {
   sfreq <- function(x, min.year=1800) {
 
-  # Checking that 'class(x)'
-  valid.class <- c("xts", "zoo")
-  if (length(which(!is.na(match(class(x), valid.class )))) <= 0)
-    stop("Invalid argument: 'x' must be in c('xts', 'zoo')" )
+    # Checking that 'class(x)'
+    valid.class <- c("xts", "zoo")
+    if (length(which(!is.na(match(class(x), valid.class )))) <= 0)
+      stop("Invalid argument: 'x' must be in c('xts', 'zoo')" )
 
-  out <- periodicity(x)$scale # xts::periodicity
+    out <- periodicity(x)$scale # xts::periodicity
 
-  if (out == "yearly") out <- "annual"
+    if (out == "yearly") out <- "annual"
 
-  return(out)
+    return(out)
 
-    }
+  }
   if (missing(FUN))
     stop("Missing argument value: 'FUN' must contain a valid function for aggregating the values")
   if (sfreq(x) %in% c("monthly", "quarterly", "annual"))
@@ -896,7 +896,7 @@ f_zonal_shp_nc<-function(ncfilename,shp,zonal_field,category=T){
     class_ratio$Ratio<-round(class_ratio$Freq/sum(class_ratio$Freq,na.rm = T),2)
     class_ratio
   }
-    # read the raster file
+  # read the raster file
   brick_input<-raster(ncfilename)
   extract_shps<-extract(brick_input,shp)
 
@@ -937,7 +937,7 @@ f_zonal_shp_nc<-function(ncfilename,shp,zonal_field,category=T){
 #'        cuts = 10,
 #'        ranges = c(3,100),
 #'        shpname = "shp")
-f_plot_sp<-function(da,filename,colstyle="RdYlGn",pretty=T,margin=list(),shpname=NA,varnames=NA,cuts=NA,ranges=NA,width=7,height=7){
+f_plot_sp<-function(da,filename,colstyle="RdYlGn",pretty=T,margin=list(),shpname=NA,varnames=NA,cuts=NA,ranges=NA,width=7,height=7,plot=T){
   library(rasterVis)
   library(RColorBrewer)
   if(!is.na(varnames)) names(da)<-varnames
@@ -959,4 +959,85 @@ f_plot_sp<-function(da,filename,colstyle="RdYlGn",pretty=T,margin=list(),shpname
   }
   print(p1)
   dev.off()
+  if(plot) print(p1)
 }
+
+## Write a NetCDF file ----
+#' Write a file to netcdf file
+#' @param filename The input nc file
+#' @param ncfname The output nc file
+#' @param varname This is the var names for the data
+#' @param lname The long name of the variable
+#' @param varunit The unit of the variable
+#' @param start_date Optional. The start date for the input data ("1982-01-01")
+#' @param scale Optional. This scale of the time series. ("1 year","1 month", "1 day")
+#' @param attrs Optional. Extra attributes for the data. c("name"="value")
+#' @param fillvalue Optional. The default fill value for the missing data.
+#' @param plot Logical. Whether plot the output nc"
+#' @keywords NetCDF write
+#' @export
+#' @examples
+#' path and file name, set dname
+#' # add global attributes
+#' attr_global<-c("Author"="Ning Liu",
+#'               "Email"="N.LIU@murdoch.edu.au",
+#'               "Institution"="Murdoch University",
+#'               "References"="Reference")
+#' f_2nc(filename="/mnt/Ning/GPP_Tr_anomaly_ann_Fixed_CO2_82_14.nc",
+#' ncfname="/mnt/Ning/tt.nc",
+#' varname = "GPP_Tr",
+#' varunit= "g C kg-1 H2O"
+#' lname = "Anomaly of annual GPP-Tr with Fixed CO2 from CALBE model",
+#' start_date = "1982-01-01",
+#' scale = "1 month")
+f_2nc<-function(filename,ncfname,varname,start_date=NA,scale="1 year",attrs=NA,fillvalue=-99.0,lname="",varunit="",plot=T){
+  library(ncdf4)
+  if(is.na(varname)) {print("varname is not defined");return}
+
+  # read original data
+  a<-brick(filename)
+  da<-as.array(a)
+  da<-aperm(da,c(2,1,3))
+  bands<-dim(a)[3]
+
+  # define dimensions
+  # define time
+  if(is.na(start_date) | is.na(scale)) {
+    print("There is no time information in the nc file")
+    timedim <- ncdim_def("Bands","", bands)
+  }else{
+    times<-seq(as.Date(start_date),by=scale,length.out = bands)
+    timedim <- ncdim_def("Time","days since 1970-01-01", as.integer(times))
+  }
+
+  # define latitude
+  xy_dataframe<-as.data.frame(a[[1]],xy=T)
+  Latdim <- ncdim_def("Latitude","degrees_north",unique(xy_dataframe$y))
+  # define longitude
+  Longdim <- ncdim_def("Longitude","degrees_east",unique(xy_dataframe$x))
+
+  # define variables
+  var_def <- ncvar_def(varname,varunit,list(Longdim,Latdim,timedim),fillvalue,dlname,compression =5)
+
+  # create netCDF file and put arrays
+  ncout <- nc_create(ncfname,var_def)
+
+  # put variables
+  ncvar_put(ncout,var_def,da)
+
+  # put additional attributes into dimension and data variables
+  attr_global<-c("Author"="Ning Liu",
+                 "Email"="N.LIU@murdoch.edu.au",
+                 "Institution"="Murdoch University",
+                 "References"="Reference")
+  if(! is.na(attrs)) attr_global<-c(attr_global,attrs)
+  for (var in names(attr_global))  ncatt_put(ncout,0,var,attr_global[[var]])
+  history <- paste("Ning Liu", date(), sep=", ")
+  ncatt_put(ncout,0,"history",history)
+  nc_close(ncout)
+  if(plot) {
+    a<-raster(ncfname)
+    print(plot(a[[1]]))
+  }
+}
+
