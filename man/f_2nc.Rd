@@ -4,11 +4,14 @@
 \alias{f_2nc}
 \title{Write a file to netcdf file}
 \usage{
-f_2nc(filename, ncfname, varname, start_date = NA, scale = "1 year",
-  attrs = NA, fillvalue = -99, lname = "", varunit = "", plot = T)
+f_2nc(filename = NA, da = NA, ncfname, varname, start_date = NA,
+  scale = "1 year", attrs = NA, fillvalue = -99, dlname = "",
+  varunit = "", plot = T)
 }
 \arguments{
 \item{filename}{The input nc file}
+
+\item{da}{The input raster object}
 
 \item{ncfname}{The output nc file}
 
@@ -22,7 +25,7 @@ f_2nc(filename, ncfname, varname, start_date = NA, scale = "1 year",
 
 \item{fillvalue}{Optional. The default fill value for the missing data.}
 
-\item{lname}{The long name of the variable}
+\item{dlname}{The long name of the variable}
 
 \item{varunit}{The unit of the variable}
 

@@ -965,9 +965,10 @@ f_plot_sp<-function(da,filename,colstyle="RdYlGn",pretty=T,margin=list(),shpname
 ## Write a NetCDF file ----
 #' Write a file to netcdf file
 #' @param filename The input nc file
+#' @param da       The input raster object
 #' @param ncfname The output nc file
 #' @param varname This is the var names for the data
-#' @param lname The long name of the variable
+#' @param dlname The long name of the variable
 #' @param varunit The unit of the variable
 #' @param start_date Optional. The start date for the input data ("1982-01-01")
 #' @param scale Optional. This scale of the time series. ("1 year","1 month", "1 day")
@@ -990,21 +991,29 @@ f_plot_sp<-function(da,filename,colstyle="RdYlGn",pretty=T,margin=list(),shpname
 #' lname = "Anomaly of annual GPP-Tr with Fixed CO2 from CALBE model",
 #' start_date = "1982-01-01",
 #' scale = "1 month")
-f_2nc<-function(filename,ncfname,varname,start_date=NA,scale="1 year",attrs=NA,fillvalue=-99.0,lname="",varunit="",plot=T){
+f_2nc<-function(filename=NA,da=NA,ncfname,varname,start_date=NA,scale="1 year",attrs=NA,fillvalue=-99.0,dlname="",varunit="",plot=T){
   library(ncdf4)
-  if(is.na(varname)) {print("varname is not defined");return}
 
-  # read original data
-  a<-brick(filename)
-  da<-as.array(a)
-  da<-aperm(da,c(2,1,3))
+  # read original data from a filename or a raster
+  if(!is.na(filename)){
+    a<-brick(filename)
+    print(paste0("read data from ",filename))
+    da<-as.array(a)
+  }else{
+    if (length(da)<=1) return("Please provide a raster filename or a raster object")
+    a<-da
+    da<-as.array(a)
+  }
+
+  if(is.matrix(da)) da<- t(da) else da<-aperm(da,c(2,1,3))
+
   bands<-dim(a)[3]
 
   # define dimensions
   # define time
   if(is.na(start_date) | is.na(scale)) {
     print("There is no time information in the nc file")
-    timedim <- ncdim_def("Bands","", bands)
+    timedim <- ncdim_def("Bands","", c(1:bands))
   }else{
     times<-seq(as.Date(start_date),by=scale,length.out = bands)
     timedim <- ncdim_def("Time","days since 1970-01-01", as.integer(times))
@@ -1028,8 +1037,7 @@ f_2nc<-function(filename,ncfname,varname,start_date=NA,scale="1 year",attrs=NA,f
   # put additional attributes into dimension and data variables
   attr_global<-c("Author"="Ning Liu",
                  "Email"="N.LIU@murdoch.edu.au",
-                 "Institution"="Murdoch University",
-                 "References"="Reference")
+                 "Institution"="Murdoch University")
   if(! is.na(attrs)) attr_global<-c(attr_global,attrs)
   for (var in names(attr_global))  ncatt_put(ncout,0,var,attr_global[[var]])
   history <- paste("Ning Liu", date(), sep=", ")
