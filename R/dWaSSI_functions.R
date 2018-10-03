@@ -403,6 +403,41 @@ snow_melt<-function(ts.prcp,ts.temp,meltmax=0.5,snowrange=c(-3,1),snowpack=0) {
 }
 
 
+# Routing calculate average flow for hucs----
+#' hucrouting
+#'
+#' Calculate accumulated flow for each huc, based on the flow direction
+#' @param water this is the original flow data for each huc
+#' @param routpar flow direction between hucs
+#' @export
+#' @examples
+#' hrurouting(water,outpar)
+
+hrurouting<-function(water,routpar,mc_cores=1){
+  library(parallel)
+  max_level<-max(routpar$LEVEL)
+
+  hru_accm<-function(hru,water,routpar){
+    hru<-as.numeric(hru)
+    water$flow[water$HUC12==hru] +sum(water$flow[water$HUC12 %in% routpar$FROM[which(routpar$TO==hru)]])
+  }
+
+  for (level in c(max_level:1)){
+    hrus<-unique(routpar$TO[routpar$LEVEL==level])
+    #print(paste0("There are ",length(hrus)," hrus in level ",level))
+
+    if(length(hrus)>100) {
+      flowaccu<-mclapply(hrus,hru_accm,water=water,routpar=routpar,mc.cores = mc_cores)
+      #print("using paralell")
+    }else{
+      flowaccu<-lapply(hrus,hru_accm,water=water,routpar=routpar)
+    }
+    for (i in c(1:length(hrus))) water$flow[water$HUC12==hrus[i]]<- flowaccu[[i]]
+  }
+  return(water)
+}
+
+
 # A SUN_ET function old----
 #' A SUN_ET function
 #'

@@ -33,7 +33,7 @@ f_lib_check(c("raster","reshape2","parallel","lubridate"))
 ```
 
 # Test run
-```{r}
+```{r,eval=F}
 Climate<-read.csv("~/dWaSSIC_R/tmp/CLIMATE.TXT")
 LAI<-read.csv("~/dWaSSIC_R/tmp/LANDLAI.TXT")
 SOIL<-read.csv("~/dWaSSIC_R/tmp/SOILINFO.TXT")
@@ -131,4 +131,213 @@ ggplot(df1, aes(date, Baseflow)) + geom_line() + labs(x = "", y = "Rain (mm/mont
 plot(df$Baseflow,df$Rain)
 df1 <- data_frame(date = seq_date,Totflow=flowR1$OUT$tot, TotET=flowR1$OUT$totaet,Srufflow = flowR1$SURF,Baseflow=flowR1$BASE,Rain=Rain_mean[589:744])
 
+```
+
+# Input data process
+
+In this step the required original input includes:  
+1. Basin or subbasin boundaries, which can be created using ```data(DEM)``` and ArcSwat toolbox in ArcGIS or using other watershed delineary tools.
+2. 
+
+## Read Catchments boundary
+```{r}
+f_lib_check(c("raster","reshape2","parallel","lubridate","rgdal","rgeos","dplyr","ggplot2"))
+Basins<-readOGR("data/shps","MJ_catchments_geo")
+Basins$BasinID<-Basins$Subbasin
+Basins$BasinID<-as.integer(as.character(Basins$BasinID))
+
+
+# get the contre coordinate of each polygen
+Basin_coords<-gCentroid(Basins, byid=TRUE)
+rownames(Basin_coords@coords)<-Basins$BasinID
+Basin_coords<-as.data.frame(Basin_coords)
+plot(Basins)
+```
+
+## CELLINFO.TXT
+```{r cellinfo}
+LUCC_catchment<-f_zonal_shp_nc(ncfilename ="data/Landcover/LUCC_Sun_IGBP.nc",shp = Basins,category = T,zonal_field = "BasinID")
+LUCC_catchment$BasinID<-as.integer(LUCC_catchment$BasinID)
+hru_lcs<-dcast(LUCC_catchment[c("BasinID","Levels","Ratio")],BasinID~Levels)
+hru_lcs[is.na(hru_lcs)]<-0.0
+
+cellinfo<-Basins@data[c("BasinID","Shape_Area","Lat","Long_","Elev","Len1")]
+cellinfo<-arrange(cellinfo,BasinID)
+cellinfo[c("Shape_Area","Elev","Len1")]<-round(cellinfo[c("Shape_Area","Elev","Len1")],0)
+cellinfo[c( "Lat","Long_")]<-round(cellinfo[c( "Lat","Long_")],3)
+cellinfo<-merge(cellinfo,hru_lcs,by="BasinID")
+cellinfo<-cbind("ID"=c(1:length(Basins)),cellinfo)
+names(cellinfo)[1:7]<-c("ID","BasinID","Area_m2","Lat","Long","Elev","Flowlen")
+write.table(cellinfo,"INPUTS/test/CELLINFO.TXT",sep = ',',row.names = FALSE)
+```
+
+## CLIMATE.TXT
+### Zonal from local data
+```{r climate_local,eval=F}
+ncfilename<-"data/Climate/PRE_mon_82_15.nc"
+Pre_catchment<-f_sta_shp_nc(ncfilename,Basins,varname = "P",start = 1982,zonal_field = "BasinID")
+
+ncfilename<-"data/Climate/TEMP_mon_82_15.nc"
+Tmean_catchment<-f_sta_shp_nc(ncfilename,Basins,varname = "T",start = 1982,zonal_field = "BasinID")
+
+climate<-Pre_catchment
+climate$Tavg<-Tmean_catchment$T
+climate<-arrange(climate,BasinID,Year,Month)
+climate<-climate[c("BasinID","Year","Month","P","Tavg")]
+climate[c("P","Tavg")]<-round(climate[c("P","Tavg")],2)
+climate$BasinID<-as.integer(as.character(climate$BasinID))
+names(climate)<-c("BasinID","Year","Month","Ppt_mm","Tavg_C")
+write.table(climate,"INPUTS/test/CLIMATE.TXT",row.names = F,sep=",")
+```
+
+### Climate data from GEE's [TERRACLIMATE](https://developers.google.com/earth-engine/datasets/catalog/IDAHO_EPSCOR_TERRACLIMATE)
+
+```{r terraclimate,eval=F}
+climate_terr<-read.csv("data/Climate/MJ_subbasins_climate.csv")
+climate_terr$date<-as.Date(as.character(climate_terr$date),format="%Y%m%d")
+climate_terr[c("aet","pet","tmmn","soil","tmmx")]<-climate_terr[c("aet","pet","tmmn","soil","tmmx")]*0.1
+climate_terr[c("pdsi")]<-climate_terr[c("pdsi")]*0.01
+climate_terr$tmean<-(climate_terr$tmmn+climate_terr$tmmn)/2
+climate_terr<-climate_terr[,-c(1,13)]
+names(climate_terr)[1]<-c("BasinID")
+climate_terr$Year<-as.integer(format(climate_terr$date,"%Y"))
+climate_terr$Month<-as.integer(format(climate_terr$date,"%m"))
+
+climate_terr<-arrange(climate_terr,BasinID,Year,Month)
+climate_terr[,c("pr","tmean")]<-round(climate_terr[,c("pr","tmean")],2)
+climate<-climate_terr[c("BasinID","Year","Month","pr","tmean")]
+names(climate)<-c("BasinID","Year","Month","Ppt_mm","Tavg_C")
+write.table(climate,"INPUTS/test/CLIMATE.TXT",row.names = F,sep=",")
+
+climate_terr%>%
+  filter(date>="2000-01-01")%>%
+  filter(BasinID %in% c("10","11"))%>%
+  ggplot(aes(x=date,y=tmean))+geom_point()+geom_line()+facet_grid(BasinID~.)
+
+```
+### CMIP5 (optional)
+```{r read CMIP5 5km-month tif,eval=F}
+f_sta_HRS_CMIP5<-function(i,shp){
+  tifs<-dir("/Dataset/backup/Climate_data/GMIP5/TIF/",pattern = "",full.names = T)
+  tif_names<-dir("/Dataset/backup/Climate_data/GMIP5/TIF/",pattern = "")
+  name<-substr(tif_names[i],1,10)
+  da_stack<-raster(tifs[i])
+  print(range(da_stack))
+   #extract all data based on each shape boundary
+  a<-raster::extract(da_stack,shp,fun=mean,df=T)
+  rm(da_stack)
+  c<-as.data.frame(t(a[-1]))
+  # get the mean value for each shp feature
+   names(c)<-shp@data$BasinID_Nu
+  c
+}
+sta_CMIP5<-f_sta_HRS_CMIP5(1,Basins)
+f_Parallel_set("r")
+sta_CMIP5<-parLapply(cl,c(1:4536),f_sta_HRS_CMIP5,shp=HRS_basin)
+save(sta_CMIP5,file="data/HRS/sta_CMIP5.RData")
+sta_CMIP5<-do.call(rbind,sta_CMIP5)
+stopCluster(cl)
+
+
+```
+
+## LANDLAI.TXT
+```{r hrulai,eval=F}
+# this function is used for zonal LAI of each HRU in by a shp file
+hru_lai<-hru_zonal(classname = "data/Landcover/LUCC_Sun_IGBP.nc",
+                      daname = "data/LAI/LAI_BNU.nc",
+                      shp = Basins,
+                      field = "BasinID")
+lcs<-paste0("Class_",names(hru_lcs)[-1])
+
+f_fillmatix<-function(a,lcs){
+  a<-round(a,2)
+  prel<-length(a[1,])+1
+  if(prel< length(lcs)+1){
+    lacks<-lcs[which(! lcs %in%  colnames(a))] 
+    for (i in c(1:length(lacks))) a<-cbind(a,lcadd=0)
+    colnames(a)[prel:length(a[1,])]<-lacks
+    a<-a[,lcs]
+  }
+}
+
+ha<-lapply(hru_lai, f_fillmatix,lcs)
+hru_lais<-do.call(rbind,ha)
+hru_lais<-cbind("ID"=rep(as.integer(names(hru_lai)),each=length(hru_lai[[1]][,1])),
+                "Year"=rep(c(2001:2014),each=12),
+                "Month"=c(1:12),
+                hru_lais)
+hru_lais<-as.data.frame(hru_lais)
+hru_lais<-arrange(hru_lais,ID,Year,Month)
+write.table(hru_lais,"INPUTS/test/LANDLAI.TXT",sep = ',',row.names = FALSE)
+
+```
+
+## SOILINFO.TXT
+```{r sta_SOIL HRS,eval=F}
+SOIL<-brick("data/Soil/SOIL_BNU.nc")
+
+SOIL_catchment<-NA
+SOIL_catchment<-extract(SOIL,Basins,fun=mean,na.rm=T,df=T)
+SOIL_catchment<-SOIL_catchment[-1]
+names(SOIL_catchment)<-c("uztwm", "uzfwm" , "uzk", "zperc" , "rexp" , "lztwm" , "lzfsm",
+                "lzfpm", "lzsk" , "lzpk" , "pfree")
+
+# fill NA values
+for (i in c(1:length(SOIL_catchment))) SOIL_catchment[[i]][is.infinite(SOIL_catchment[[i]])]<-NA
+for (i in c(1:length(SOIL_catchment))) SOIL_catchment[[i]][is.na(SOIL_catchment[[i]])]<-30
+
+SOIL_catchment<-cbind(BasinID=Basins$BasinID,SOIL_catchment)
+
+SOIL_catchment[c(2:12)]<-round(SOIL_catchment[c(2:12)],2)
+write.table(SOIL_catchment[c(1:12)],"INPUTS/test/SOILINFO.TXT",sep = ',',row.names = FALSE)
+```
+
+## GENERAL.TXT
+```{r general}
+generalinfo<-c()
+generalinfo[1]<-"Minjiang watershed Simulation by Cell or Catchment, Sep. 2018 (Ning Liu)"
+generalinfo[2]<-"0                                                Scenarios (See Explaination Below)"
+generalinfo[3]<-"0                                                Catchment or Grid scale (0 for Catchment, 1 for Grid)"
+generalinfo[4]<-"22, 62, 1951, 10                                 (No watersheds, NoYEARS, first year of climate data, number of land cover categories)"
+generalinfo[5]<-"2000, 2012                                       (Start and end years for LAI data)"
+generalinfo[6]<-"5,2000, 2012                                     (Years for warmup, and Start and end years for simulation)"
+generalinfo[7]<-"0.0                                              (FOREST REDUCTION TO CONVERT CROPLAND (FRACTION 0-1))"
+generalinfo[8]<-"0.0                                              (Reduction fraction of Leaf Area Index, 0.0=no change, 1.0= convert to bared soil) "
+generalinfo[9]<-"0.0                                              INTIAL SNOWPACK (MM)"
+generalinfo[10]<-""
+generalinfo[11]<-""
+generalinfo[12]<-"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+generalinfo[13]<-"Simulation Scenarios"
+generalinfo[14]<-"0 - Historic baseline 1901-2002"
+generalinfo[15]<-"1 - Deforestation"
+generalinfo[16]<-"2 - LAI reduction (same land use, but different cover) "
+writeLines(generalinfo,"INPUTS/test/GENERAL.TXT")
+```
+
+# Routing
+```{r}
+water<-read.csv("~/Downloads/FOR_NING/out/CONUSF2F_MA_WATER.TXT")
+routpar<-read.csv("~/Downloads/FOR_NING/INPUTS/HUC12_CONUS_ROUTE_TABLE.txt")
+water$flow<-water$YLD_ALL*water$AREA_M2/1000/1000000
+
+ha<-hrurouting(water,routpar,mc_cores = 5)
+
+out<-read.csv("~/Downloads/FOR_NING/out/CONUSF2F_MA_FLOW_HUC12.TXT")
+head(out[,c(1,5)],10)
+head(ha[,c(1,15)],10)
+
+```
+
+
+# Fortran version
+## RUN fortran version
+```{bash}
+cd src/
+make 
+rm  ../OUTPUTS/*
+./dWaSSIC  1 ../INPUTS/Inputs_catchment ../OUTPUTS
+#./dWaSSIC  1 ../INPUTS/Inputs_grid ../OUTPUTS
+echo "finished"
+make clean
 ```
