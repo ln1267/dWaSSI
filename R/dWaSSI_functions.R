@@ -1,5 +1,409 @@
-# WaSSI-Model functions (f_SUN_ET,f_WaSSI,f_cal_WaSSI)
+# dWaSSI-C Model functions
 
+# Distributed wrap of dWaSSI model----
+#' @title Distribution wrap of dWaSSI-C
+#' @description FUNCTION_DESCRIPTION
+#' @param str.date  vector of mean daily temperature (deg C)
+#' @param end.date latitude ()
+#' @param str.date.climate a day number of the year (julian day of the year)
+#' @param end.date.climate a day number of the year (julian day of the year)
+#' @return outputs potential evapotranspiration (mm day-1)
+#' @details For details see Haith and Shoemaker (1987)
+#' @examples
+#' \dontrun{
+#' distHydroSim(str.date = str_date, end.date = end_date,
+#'              str.date.climate =str_date, end.date.climate  = end_date,
+#'              hru.par = hru_par, hru.info = hru_info, hru.elevband = NULL,
+#'              clim.prcp = stcroix$prcp.grid, clim.tavg = stcroix$tavg.grid,
+#'              snow.flag = 0, progress.bar = TRUE)
+#' }
+#' @rdname distHydroSim
+#' @export
+#'
+distHydroSim <- function(str.date = NULL, end.date = NULL, warmup=3,
+                         str.date.climate =NULL, end.date.climate  = NULL,
+                         str.date.lai =NULL, end.date.lai  = NULL,
+                         par.sacsma = NULL,par.petHamon=NULL, par.snow17=NULL,par.routLah=NULL,
+                         hru.info = NULL, hru.elevband = NULL,
+                         clim.prcp = NULL, clim.tavg = NULL,
+                         hru.lai=NULL,hru.lc.lai=NULL,huc.lc.ratio=NULL,
+                         snow.flag = 0, progress.bar = TRUE,month=F) {
+
+  # date vectors
+  sim_date <- seq.Date(str.date-years(warmup), end.date, by = "month")
+  #jdate <- as.numeric(format(sim_date, "%j"))
+  jdate <-  c(15,46,76,107,137,168,198,229,259,290,321,351)
+  ydate <- as.POSIXlt(sim_date)$year + 1900
+  ddate <- as.POSIXlt(as.Date(paste0(ydate,"/12/31")))$yday + 1
+  days_mon<-sapply (sim_date,numberOfDays)
+
+  # Simulation parameters
+  sim_num  <- length(sim_date)  # number of simulation steps (months)
+  hru_num  <- nrow(hru.info)  # number of HRUs
+  # Extract the sim period from the climate data for each HRU
+  climate_date <- seq.Date(str.date.climate, end.date.climate, by = "month")
+  grid_ind <-which(climate_date %in% sim_date)
+  hru_prcp <- clim.prcp[grid_ind,]
+  hru_tavg <- clim.tavg[grid_ind,]
+
+  # HRU parameters
+  hru_num   <- nrow(hru.info)  # total number of hrus in the watershed
+  hru_lat     <- hru.info$HRU_Lat # Latitude of each HRU (Deg)
+  hru_lon     <- hru.info$HRU_Lon # Longitude of each HRU (Deg)
+  hru_area    <- hru.info$HRU_Area # Area of each HRU (as %)
+  hru_elev    <- hru.info$`HRU_Elev(m)` # Elevation of each HRU (m)
+  hru_flowlen <- hru.info$`HRU_FlowLen(m)` # Flow length for each HRU (m)
+  tot_area    <- sum(hru_area) # Total area of the watershed system
+
+  #  Elevation band parameters
+  if (!is.null(hru.elevband)) {
+    elevband_num         <- (dim(hru.elevband)[2]-2)/2
+    hru_elevband_frac     <- hru.elevband[,3:(elevband_num +2)]
+    hru_elevband_elev_avg <- hru.elevband[,(elevband_num +3):ncol(hru.elevband)]
+  }
+
+  #Final surfaceflow and baseflow at the outlet
+  FLOW_SURF <- vector(mode = "numeric", length = sim_num)
+  FLOW_BASE <- vector(mode = "numeric", length = sim_num)
+
+  # Loop through each HRU and calculate adjust temp and pet values
+  if(progress.bar == TRUE) pb <- txtProgressBar(min=0, max=hru_num, style=3)
+  for (h in 1:hru_num) {
+
+    # Vectors for surface and baseflow generated at each hru
+    flow_direct_tot <- vector(mode = "numeric", length = sim_num)
+    flow_base_tot   <- vector(mode = "numeric", length = sim_num)
+
+    # If elevation bands are not specified
+    if (is.null(hru.elevband)) {
+
+      # If snow module is active, calculate snow
+      if (snow.flag == 1) {
+        hru_mrain <- snow17(par_snow17[h,], hru_prcp[,h], hru_tavg[,h], hru_elev[h], jdate)
+      } else {
+        hru_mrain <- snow_melt(ts.prcp = hru_prcp[,h],ts.temp = hru_tavg[,h],snowrange = c(-5,1))$prcp
+      }
+      # PET using Hamon equation
+      hru_pet <- hamon(par = par_petHamon[h], tavg = hru_tavg[,h], lat = hru_lat[h], jdate = jdate)
+      hru_pet<-hru_pet*days_mon
+      # Calculate hru flow for each elevation band
+      ## calculate flow for each land cover type
+      if(is.null(hru.lc.lai) | is.null(huc.lc.ratio)){
+
+        if(!is.null(hru.lai)) hru_pet<- hru_pet*hru.lai[,h]*0.0222+0.174*hru_mrain+0.502*hru_pet+5.31*hru.lai[,h]
+
+        if( month){
+          out <- sacSma_mon(par = par_sacsma[h,], prcp = hru_mrain, pet = hru_pet)
+        }else{
+          out <- sacSma(par = par_sacsma[h,], prcp = hru_mrain, pet = hru_pet)
+        }
+
+      }else{
+        # if lai data is not enough
+        if(is.null(str.date.lai)) str.date.lai<-str.date
+        if(is.null(end.date.lai)) end.date.lai<-end.date
+
+        ## set the first year lai to before
+        if(str.date.lai>str.date-years(warmup)){
+          lack_lai_years<-floor(as.numeric(difftime(str.date.lai,str.date-years(warmup),units="days")/365))
+          hru.lc.lai<-lapply(hru.lc.lai,function(x) rbind(apply(x[1:12,],2,rep,lack_lai_years),x))
+          str.date.lai<-str.date-years(warmup)
+        }
+        ## set the last year lai to after
+        if(end.date.lai<end.date){
+          lack_lai_years<-floor(as.numeric(difftime(end.date,end.date.lai,units="days")/365))
+          start1<-length(hru.lc.lai[[1]][,1])-11
+          hru.lc.lai<-lapply(hru.lc.lai,function(x) rbind(x,apply(x[start1:(start1+11),],2,rep,lack_lai_years)))
+          end.date.lai<-end.date
+        }
+
+        # filter lai data by the simulation date
+        lai_date <- seq.Date(str.date.lai, end.date.lai, by = "month")
+        grid_ind_lai <-which(lai_date %in% sim_date)
+        hru.lc.lai<-lapply(hru.lc.lai,function(x) x[grid_ind_lai,] )
+
+        # Calculate PET based on LAI
+        hru_lc_pet<-hru_pet*hru.lc.lai[[h]]*0.0222+0.174*hru_mrain+0.502*hru_pet+5.31*hru.lc.lai[[h]]
+        hru_lc_out <-apply(hru_lc_pet,2,sacSma_mon,par = par_sacsma[h,], prcp = hru_mrain )
+
+        # Weight each land cover type based on it's ratio
+        hru_out<-lapply(c(1:length(huc.lc.ratio[h,])),function(x) lapply(hru_lc_out[[x]],function(y) huc.lc.ratio[h,x]*y))
+        out<-lapply(names(hru_lc_out[[1]]), function(var) apply(sapply(hru_out, function(x) x[[var]]),1,sum))
+        names(out)<-names(hru_lc_out[[1]])
+      }
+
+      flow_direct_tot <- out$surf
+      flow_base_tot   <- out$base
+
+    } else {
+
+      #Loop through each elevation band
+      for (nn in 1:elevband_num) {
+
+        if(hru_elevband_frac[h, nn] > 0) {
+
+          # Adjusted temperature
+          hru_tavg_adj <- hru_tavg[[h]] - 6.1 * (hru_elev[[h]] - hru_elevband_elev_avg[h, nn]) / 1000
+
+          # Adjusted PET
+          hru_pet_adj <- hamon(par = par_petHamon[h], tavg = hru_tavg_adj, lat = hru_lat[h], jdate = jdate)
+
+          # If snow module is active, calculate snow
+          if (snow.flag == 1) {
+            hru_mrain <- snow17(par_snow17, hru_prcp[[h]], hru_tavg_adj, hru_elev[h], jdate)
+          } else {
+            hru_mrain <- hru_prcp[[h]]
+          }
+
+          # Calculate hru flow for each elevation band
+          out <- sacSma(par = par_sacsma[h,], prcp = hru_mrain, pet = hru_pet_adj)
+          flow_direct_tot <- flow_direct_tot + out$surf * hru_elevband_frac[h,nn]
+          flow_base_tot   <- flow_base_tot   + out$base * hru_elevband_frac[h,nn]
+
+        }
+
+      } # close loop elev. bands
+
+    }
+
+    #---------- Channel flow routing from Lohmann routing model ---------------#
+    out2 <- lohamann(par = par_routLah[h,], inflow.direct = flow_direct_tot,
+                     inflow.base = flow_base_tot, flowlen = hru_flowlen[h])
+
+    FLOW_SURF <- FLOW_SURF + out2$surf * hru_area[h] / tot_area
+    FLOW_BASE <- FLOW_BASE + out2$base * hru_area[h] / tot_area
+
+    if(progress.bar == TRUE) setTxtProgressBar(pb, h)
+  }
+
+  if(progress.bar == TRUE) close(pb)
+  # get the real simulate period result
+  FLOW_SURF<-FLOW_SURF[(warmup*12+1):length(FLOW_SURF)]
+  FLOW_BASE<-FLOW_BASE[(warmup*12+1):length(FLOW_BASE)]
+  out<- lapply(out, function(x) x[(warmup*12+1):length(x)])
+  return(list(SURF = FLOW_SURF, BASE = FLOW_BASE,OUT=out))
+}
+
+
+# Parallel wrap of WaSSI-C model----
+#' @title Parallel wrap of WaSSI-C model
+#' @description FUNCTION_DESCRIPTION
+#' @param str.date  vector of mean daily temperature (deg C)
+#' @param end.date latitude ()
+#' @param str.date.climate a day number of the year (julian day of the year)
+#' @param end.date.climate a day number of the year (julian day of the year)
+#' @param warmup years for warming up WaSSI-C model
+#' @param mcores how many cores using for simulation
+#' @param str.date.lai start of the lai data
+#' @return outputs potential evapotranspiration (mm day-1)
+#' @details For details see Haith and Shoemaker (1987)
+#' @examples
+#' \dontrun{
+#' distHydroSim(str.date = str_date, end.date = end_date,
+#'              str.date.climate =str_date, end.date.climate  = end_date,
+#'              hru.par = hru_par, hru.info = hru_info, hru.elevband = NULL,
+#'              clim.prcp = stcroix$prcp.grid, clim.tavg = stcroix$tavg.grid,
+#'              snow.flag = 0, progress.bar = TRUE)
+#' }
+#' @rdname dWaSSIC
+#' @export
+#'
+dWaSSIC<- function(str.date = NULL, end.date = NULL, warmup=3,mcores=1,
+                   str.date.climate =NULL, end.date.climate  = NULL,
+                   str.date.lai =NULL, end.date.lai  = NULL,
+                   par.sacsma = NULL,par.petHamon=NULL,
+                   hru.info = NULL,
+                   clim.prcp = NULL, clim.tavg = NULL,
+                   hru.lai=NULL,hru.lc.lai=NULL,huc.lc.ratio=NULL)
+{
+
+  # date vectors
+  sim_date <- seq.Date(str.date-years(warmup), end.date, by = "month")
+  #jdate <- as.numeric(format(sim_date, "%j"))
+  jdate <-  c(15,46,76,107,137,168,198,229,259,290,321,351)
+  ydate <- as.POSIXlt(sim_date)$year + 1900
+  ddate <- as.POSIXlt(as.Date(paste0(ydate,"/12/31")))$yday + 1
+  days_mon<-sapply (sim_date,numberOfDays)
+
+  # Simulation parameters
+  sim_num  <- length(sim_date)  # number of simulation steps (months)
+  hru_num  <- nrow(hru.info)  # number of HRUs
+  # Extract the sim period from the climate data for each HRU
+  climate_date <- seq.Date(str.date.climate, end.date.climate, by = "month")
+  grid_ind <-which(climate_date %in% sim_date)
+  hru_prcp <- clim.prcp[grid_ind,]
+  hru_tavg <- clim.tavg[grid_ind,]
+
+  # HRU parameters
+  hru_num   <- nrow(hru.info)  # total number of hrus in the watershed
+  hru_lat     <- hru.info$HRU_Lat # Latitude of each HRU (Deg)
+  hru_lon     <- hru.info$HRU_Lon # Longitude of each HRU (Deg)
+  # hru_area    <- hru.info$HRU_Area # Area of each HRU (as %)
+  # hru_elev    <- hru.info$`HRU_Elev(m)` # Elevation of each HRU (m)
+
+  # WaSSI for each HRU and calculate adjust temp and pet values
+
+  WaSSI<-function(h){
+
+    # Using snowmelt function to calculate effective rainfall
+
+    hru_mrain <- snow_melt(ts.prcp = hru_prcp[,h],ts.temp = hru_tavg[,h],snowrange = c(-5,1))$prcp
+
+    # PET using Hamon equation
+    hru_pet <- hamon(par = par_petHamon[h], tavg = hru_tavg[,h], lat = hru_lat[h], jdate = jdate)
+    hru_pet<-hru_pet*days_mon
+    # Calculate hru flow for each elevation band
+    ## calculate flow for each land cover type
+
+    # if lai data is not enough
+    if(is.null(str.date.lai)) str.date.lai<-str.date
+    if(is.null(end.date.lai)) end.date.lai<-end.date
+
+    ## set the first year lai to before
+    if(str.date.lai>str.date-years(warmup)){
+      lack_lai_years<-floor(as.numeric(difftime(str.date.lai,str.date-years(warmup),units="days")/365))
+      hru.lc.lai<-lapply(hru.lc.lai,function(x) rbind(apply(x[1:12,],2,rep,lack_lai_years),x))
+      str.date.lai<-str.date-years(warmup)
+    }
+    ## set the last year lai to after
+    if(end.date.lai<end.date){
+      lack_lai_years<-floor(as.numeric(difftime(end.date,end.date.lai,units="days")/365))
+      start1<-length(hru.lc.lai[[1]][,1])-11
+      hru.lc.lai<-lapply(hru.lc.lai,function(x) rbind(x,apply(x[start1:(start1+11),],2,rep,lack_lai_years)))
+      end.date.lai<-end.date
+    }
+
+    # filter lai data by the simulation date
+    lai_date <- seq.Date(str.date.lai, end.date.lai, by = "month")
+    grid_ind_lai <-which(lai_date %in% sim_date)
+    hru.lc.lai<-lapply(hru.lc.lai,function(x) x[grid_ind_lai,] )
+
+    # Calculate PET based on LAI
+    hru_lc_pet<-hru_pet*hru.lc.lai[[h]]*0.0222+0.174*hru_mrain+0.502*hru_pet+5.31*hru.lc.lai[[h]]
+    hru_lc_out <-apply(hru_lc_pet,2,sacSma_mon,par = par_sacsma[h,], prcp = hru_mrain )
+
+    # Weight each land cover type based on it's ratio
+    hru_out<-lapply(c(1:length(huc.lc.ratio[h,])),function(x) lapply(hru_lc_out[[x]],function(y) huc.lc.ratio[h,x]*y))
+    out<-lapply(names(hru_lc_out[[1]]), function(var) apply(sapply(hru_out, function(x) x[[var]]),1,sum))
+    names(out)<-names(hru_lc_out[[1]])
+
+    return(out)
+  }
+
+  # get the real simulate period result
+  if(mcores>1){
+    result<-mclapply(c(1:hru_num), WaSSI,mc.cores = mcores)
+  }else{
+    result<-lapply(c(1:hru_num), WaSSI)
+  }
+
+  result<- lapply(result, function(x) as.data.frame(x)[(warmup*12+1):length(x[[1]]),])
+  return(result)
+}
+
+# Hamon Potential Evapotranspiration Equation----
+#' @title Hamon Potential Evapotranspiration Equation
+#' @description The Hamon method is also considered as one of the simplest estimates
+#'     of potential Evapotranspiration.
+#' @param par proportionality coefficient (unitless)
+#' @param tavg  vector of mean daily temperature (deg C)
+#' @param lat latitude ()
+#' @param jdate a day number of the year (julian day of the year)
+#' @return outputs potential evapotranspiration (mm day-1)
+#' @details For details see Haith and Shoemaker (1987)
+#' @examples
+#' \dontrun{
+#' if(interactive()){
+#'  #EXAMPLE1deg
+#'  }
+#' }
+#' @rdname hamon
+#' @export
+hamon <- function(par, tavg, lat, jdate) {
+
+  var_theta <- 0.2163108 + 2 * atan(0.9671396 * tan(0.0086 * (jdate - 186)))
+  var_pi <- asin(0.39795 * cos(var_theta))
+  daylighthr <- 24 - 24/pi * acos((sin(0.8333 * pi/180) + sin(lat * pi/180) * sin(var_pi))/(cos(lat *
+                                                                                                  pi/180) * cos(var_pi)))
+
+  esat <- 0.611 * exp(17.27 * tavg/(237.3 + tavg))
+
+  return(par * 29.8 * daylighthr * (esat/(tavg + 273.2)))
+
+}
+
+
+# SNOW Model based on Tavg----
+#' @title SNOW Model
+#' @description Peter's Snow model
+#' @param ts.prcp numeric vector of precipitation time-series (mm)
+#' @param ts.temp numeric vector of average temperatuer time-series (Deg C)
+#' @param snowrange (-3,1) the temperature range between snow and rain
+#' @param meltmax  maximium ratio of snow melt (default: 0.5)
+#' @param snowpack  initial snowpack (default: 0)
+#' @return a dataframe of c("prcp","snowpack","snowmelt"), effective rainfall, snowpack and snowmelt
+#' @rdname snowmelt
+#' @details This is based on Peter's Fortran code
+#' @examples
+#' \dontrun{
+#' mellt<-snow_melt(ts.prcp,ts.temp,meltmax=0.5,snowrange=c(-3,1),snowpack=0)
+#' }
+#' @export
+snow_melt<-function(ts.prcp,ts.temp,meltmax=0.5,snowrange=c(-3,1),snowpack=0) {
+
+  # Define outputs
+  ts.snowpack <- vector(mode = "numeric", length = length(ts.prcp))
+  ts.snowmelt <- vector(mode = "numeric", length = length(ts.prcp))
+  ts.prcp.eff<- vector(mode = "numeric", length = length(ts.prcp))
+  # loop each time step
+  for (i in c(1:length(ts.prcp))){
+    tavg<-ts.temp[i];prcp<-ts.prcp[i]
+    # ---- FOR TEMPERATURE LESS THAN SNOW TEMP, CALCULATE SNOWPPT
+    if (tavg <= snowrange[1]) {
+      snow<-prcp
+      rain<-0
+      # ---- FOR TEMPERATURE GREATER THAN RAIN TEMP, CALCULATE RAINPPT
+    }else if (tavg >= snowrange[2]){
+      rain<-prcp
+      snow<-0
+      # ---- FOR TEMPERATURE BETWEEN RAINTEMP AND SNOWTEMP, CALCULATE SNOWPPT AND RAINPPT
+    }else{
+      snow<- prcp*((snowrange[2] - tavg)/(snowrange[2] - snowrange[1]))
+      rain<-prcp-snow
+    }
+    # Calculate the snow pack
+    snowpack<-snowpack+snow
+    # ---- CALCULATE SNOW MELT FRACTION BASED ON MAXIMUM MELT RATE (MELTMAX) AND MONTHLY TEMPERATURE
+
+    snowmfrac = ((tavg-snowrange[1])/(snowrange[2] - snowrange[1]))*meltmax
+
+    if (snowmfrac >= meltmax) snowmfrac <- meltmax
+    if (snowmfrac <0) snowmfrac <- 0
+
+    # ---- CALCULATE AMOUNT OF SNOW MELTED (MM) TO CONTRIBUTE TO INFILTRATION & RUNOFF
+
+    # ---- IF SNOWPACK IS LESS THAN 10.0 MM, ASSUME IT WILL ALL MELT (MCCABE AND WOLOCK, 1999)
+    # ---- (GENERAL-CIRCULATION-MODEL SIMULATIONS OF FUTURE SNOWPACK IN THE WESTERN UNITED STATES)
+
+    if (snowpack <= 10.0) {
+      snowm<-snowpack
+      snowpack<- 0
+
+    }else{
+      snowm = snowpack * snowmfrac
+      snowpack = snowpack - snowm
+    }
+
+    # -- COMPUTE THE INFILTRATION FOR A GIVEN MONTH FOR EACH LAND USE
+    ts.snowpack[i]<-snowpack
+    ts.snowmelt[i]<-snowm
+    ts.prcp.eff[i]<-rain+snowm
+  }
+  return(data.frame(prcp=ts.prcp.eff,snowpack=ts.snowpack,snowmelt=ts.snowmelt))
+}
+
+
+# A SUN_ET function old----
 #' A SUN_ET function
 #'
 #' Calculate PET of each pixel/watershed with monthly temperature data by using Hamon's PET formular and then calculate SUN_ET with monthly ET~f(P,LAI,PET)

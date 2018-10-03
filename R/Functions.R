@@ -32,6 +32,166 @@ f_lib_check<-function(libs){
 }
 
 
+# get the number of days for each month----
+
+# This is an example function named 'hello'
+# which prints 'Hello, world!'.
+#
+# You can learn more about package authoring with RStudio at:
+#
+#   http://r-pkgs.had.co.nz/
+#
+# Some useful keyboard shortcuts for package authoring:
+#
+#   Build and Reload Package:  'Ctrl + Shift + B'
+#   Check Package:             'Ctrl + Shift + E'
+#   Test Package:              'Ctrl + Shift + T'
+
+#' This function allows you to get the number of days for a specific month.
+#' @param date A date object.
+#' @keywords cats
+#' @export
+#' @examples
+#' date<-as.Date("2001-01-01")
+#' numberOfDays(date)
+numberOfDays <- function(date) {
+  m <- format(date, format="%m")
+
+  while (format(date, format="%m") == m) {
+    date <- date + 1
+  }
+
+  return(as.integer(format(date - 1, format="%d")))
+}
+
+# Zonal a variable for each Hru in dWaSSI-C----
+#' @title Zonal a variable for each Hru in dWaSSI-C
+#' @description FUNCTION_DESCRIPTION
+#' @param classname  a raster of each hru it can be vegetation type or soil type
+#' @param daname The input brick data that will be zonaled by hru
+#' @param varname The name of the zonaled variable
+#' @param shp the zonal boundary
+#' @param field the field of the shp boundary that will used for zonal
+#' @details This is a function for zonal hru data
+#' @examples
+#' \dontrun{
+#'ha<-hru_zonal(classname = "inputs/Landcover/LUCC_Sun_IGBP.nc",
+#'              daname = "inputs/LAI/LAI_BNU.nc",
+#'             shp = Basins,
+#'             field="Station")
+#' }
+#' @rdname hru_zonal
+#' @export
+# this function is used for zonal LAI of each HRU in by a shp file
+hru_zonal<-function(classname,daname,shp,fun='mean',field=NULL,plot=T){
+  require(raster)
+  # read the class and data by their names
+  class<-raster(classname)
+  da<-brick(daname)
+
+  # crop data based on the input shp
+  class<-crop(class,shp)
+  da<-crop(da,shp)
+
+  # resample class data based on the input data (Their geo reference could be different)
+  class<-resample(class,da[[1]],method='ngb')
+  class<-raster::mask(class,shp)
+  da<-raster::mask(da,shp)
+
+  shp@data[,field]<-as.character(shp@data[,field])
+
+  # get the number class and their percentage and plot some base map
+  print(raster::unique(class))
+  if(plot){
+    nclass<-raster::unique(class)
+    print(table(matrix(class)))
+    plot(class)
+    plot(da[[1]],add=T,alpha=0.5)
+    plot(shp,add=T)
+  }
+
+  # funtion for zonal each polygon
+  f_zonal<-function(i){
+    polygon1<-shp[i,]
+    class1<-crop(class,polygon1)
+    da1<-crop(da,polygon1)
+    class1<-raster::mask(class1,polygon1)
+    da1<-raster::mask(da1,polygon1)
+    da_zonal1<-zonal(da1, class1, fun)
+    namesls<-paste0("Class_",da_zonal1[,1])
+    da_zonal1<-t(da_zonal1[,-1])
+    colnames(da_zonal1)<-namesls
+    return(da_zonal1)
+  }
+
+  # Run sta
+  if(length(shp)>1){
+    da_zonal<- lapply(c(1:length(shp)), f_zonal)
+    names(da_zonal)<-shp@data[,field]
+  }else{
+    da_zonal<-zonal(da, class, fun)
+    namesls<-paste0("Class_",da_zonal)
+    da_zonal<-t(da_zonal[,-1])
+    colnames(da_zonal)<-namesls
+  }
+
+  return(da_zonal)
+}
+
+# Zonal vegetation coverage for each Hru in dWaSSI-C----
+#' @title Zonal vegetation coverage for each Hru in dWaSSI-C
+#' @description FUNCTION_DESCRIPTION
+#' @param classname  a raster of each hru it can be vegetation type or soil type
+#' @param varname The name of the zonaled variable
+#' @param shp the zonal boundary
+#' @param field the field of the shp boundary that will used for zonal
+#' @details This is a function for zonal hru data
+#' @examples
+#' \dontrun{
+#'ha<-hru_lc_ratio(classname = "inputs/Landcover/LUCC_Sun_IGBP.nc",
+#'             shp = Basins,
+#'             field="Station")
+#' }
+#' @rdname hru_lc_ratio
+#' @export
+# this function is used for zonal vegetation ratio of each HRU in by a shp file
+
+hru_lc_ratio<-function(classname,shp,field=NULL){
+  library(raster)
+  class<-raster(classname)
+  class<-crop(class,shp)
+  class<-mask(class,shp)
+  print(table(matrix(class)))
+
+  # zonal_for each polygon
+  f_zonal<-function(i){
+    polygon1<-shp[i,]
+    class1<-crop(class,polygon1)
+    class_ratio<-as.data.frame(table(matrix(class1))/sum(table(matrix(class1))))
+    names(class_ratio)<-c("Class","Ratio")
+    class_ratio$Ratio<-round(class_ratio$Ratio,2)
+    class_ratio$Count<-table(matrix(class1))
+    class_ratio[field]<-polygon1@data[field]
+    return(class_ratio)
+  }
+
+  # Run sta
+  if(length(shp)>1){
+    lc_ratio<- lapply(c(1:length(shp)), f_zonal)
+    lc_ratio<-do.call(rbind,lc_ratio)
+  }else{
+    class_ratio<-as.data.frame(table(matrix(class))/sum(table(matrix(class))))
+    names(class_ratio)<-c("Class","Ratio")
+    class_ratio$Ratio<-round(class_ratio$Ratio,2)
+    class_ratio$Count<-table(matrix(class))
+    class_ratio[field]<-polygon1@data[field]
+    lc_ratio<-class_ratio
+  }
+
+  return(lc_ratio)
+}
+
+
 ## Trim the anomaly for a variable----
 ### treat +0.5% and -0.5% value as anomaly
 cutAnomalies <- function(x){

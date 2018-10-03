@@ -4,9 +4,9 @@
 \alias{f_plot_sp}
 \title{Plot spatial data with overlap shpfile}
 \usage{
-f_plot_sp(da, filename, colstyle = "RdYlGn", pretty = T, margin = list(),
-  shpname = NA, varnames = NA, cuts = NA, ranges = NA, width = 7,
-  height = 7, plot = T)
+f_plot_sp(da, filename, colstyle = "RdYlGn", pretty = T,
+  margin = list(), shpname = NA, varnames = NA, cuts = NA,
+  ranges = NA, width = 7, height = 7, plot = T)
 }
 \arguments{
 \item{da}{The input nc file.}
