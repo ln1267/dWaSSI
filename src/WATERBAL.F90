@@ -9,7 +9,7 @@
 !     IF MODEL in dynamic land cover then LADUSE(I) -----> VEG(I,J) total:38   C
 !**********************************************************************C
       
-      SUBROUTINE WATERBAL(I,J_S,M,MNDAY,RUNLAND,ETLAND,GEPLAND)
+      SUBROUTINE WATERBAL(I,J_S,M,MNDAY)
         Use Common_var
         implicit none       
 ! ----------------------------------------------------------------------------     
@@ -48,9 +48,9 @@
            
      ! INTEGER GEPFLAG
       
-    REAL :: RUNLAND(NGRID,NYEAR_S+NWARMUP,12,31)
-    REAL :: ETLAND(NGRID,NYEAR_S+NWARMUP,12,31)
-    REAL :: GEPLAND(NGRID,NYEAR_S+NWARMUP,12,31) 
+    !REAL :: RUNLAND(NGRID,NYEAR_S+NWARMUP,12,31)
+    !REAL :: ETLAND(NGRID,NYEAR_S+NWARMUP,12,31)
+    !REAL :: GEPLAND(NGRID,NYEAR_S+NWARMUP,12,31) 
            
 ! *****************************************************************************************************
 
@@ -571,15 +571,21 @@
 
 ! *****************************************************************************************************
     ! Calculate GEP based on ET and the equation
-
+        IF (LC_N .LE. 0) THEN 
+            GEP(J,M)=0.0
+            RECO(J,M)=0.0
+            goto 6101
+        ENDIF
+        
         GEP(J,M) = wue_k(LC_N) * ET(J,M)
+
         IF (GEP(J,M) .LE. 0)   THEN
             GEP(J,M)=0.0 
         ENDIF         
         !print*,I,LADUSE(I)
         RECO(J,M)= (reco_inter(LC_N) + reco_slope(LC_N) * GEP(J,M)*MNDAY)/MNDAY
         
-        NEE(J,M)=  RECO(J,M)- GEP(J,M) 
+6101        NEE(J,M)=  RECO(J,M)- GEP(J,M) 
 
 
 ! **************************----Finish calculate Carbon balances--------************************************************
@@ -627,9 +633,9 @@
                IFTEMP = IFTEMP + INF                   
 ! *****************************************************************************************************
 
-            RUNLAND(I,J_S,M,DAY) = SURFRO + PBF + SBF + INF
-            ETLAND(I,J_S,M,DAY) = ET(J,M)
-            GEPLAND(I,J_S,M,DAY) = GEP(J,M)
+    !        RUNLAND(I,J_S,M,DAY) = SURFRO + PBF + SBF + INF
+      !      ETLAND(I,J_S,M,DAY) = ET(J,M)
+       !     GEPLAND(I,J_S,M,DAY) = GEP(J,M)
             
 !--- calculate the monthly total soil moisture 
               
