@@ -315,11 +315,12 @@
          AHUCNEE(I) = HUCNEE/NUM_YEAR_C(I)
             
       
-
+    IF (I .LT. 10) THEN 
              WRITE (*, 4000) HUCNO(I),NUM_YEAR_C(I), AHUCGEP(I), AHUCRE(I), AHUCNEE(I)
                                               
- 4000        FORMAT (I12, ',', I12, ',',F14.2, ',', F14.2, ',', F14.2)       
+ 4000        FORMAT ('ID=',I12, ', YNO. =', I4, ', GEP=',F8.1, ', ER=', F8.1, ', NEE=', F9.1)       
    
+    ENDIF
 
       RETURN
       END

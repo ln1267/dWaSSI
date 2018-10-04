@@ -59,29 +59,23 @@
                       
        40      CONTINUE                   
                   
-    ! ------APAET =AVERAGE PAET FOR CURRENT CELL, FOR ALL YEAR, MONTH
-
-                  PAET(I,J,M) = TPAET
-            if (I.eq.1 .and. J.lt.IYSTART+2) then      
-            Print*,I,J,M,TPAET
-            endif
-
+        PAET(I,J,M) = TPAET
     ELSE
            
 ! Latest model By Yuan Fang Sep 10,2015
 !          R2=0.68, p<0.0001,RMSE=18.1 mm
 
-            PAET(I,J,M) = -4.79 + 0.75*PET(I,J,M) + 3.92*LAI(I,J,M)
-   
-! ------TEST OUTPUT
-
-
-!       WRITE(*, 5050) HUCNO(I),J,M, PET(I,J,M), PAET(I,J,M) 
-!      
-!5050  FORMAT (3I10, 2F10.5)
+        PAET(I,J,M) = -4.79 + 0.75*PET(I,J,M) + 3.92*LAI(I,J,M)
 
     ENDIF                          
-     
+
+! Testing output of ET    
+    if (I.eq.1 .and. J.lt.IYSTART+2) then      
+    
+    Print*,I,J,M,'PAET=',PAET(I,J,M)
+    
+    endif 
+    
     RETURN
     
     END

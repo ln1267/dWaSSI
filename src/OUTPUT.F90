@@ -76,7 +76,10 @@
                 
 2100            FORMAT(I10, ',', I10, ',',F10.1, ',', F8.1, ',', F8.1,',' F8.1, &
                     ',',F8.1, ',', F8.2, ',',F8.2,',',F8.2,',', I8, ',', F8.1)
-                IF (I==1) print*,I,IDY,ANUAET(I,J)
+
+! Testing output
+ IF (I==1) print*,"I=", I,"Year=",IDY,"Anual AET = ",ANUAET(I,J)
+					
                 WRITE (500, 20001) HUCNO(I), IDY, ANGEP(I,J),ANRECO(I,J), ANNEE(I,J),ANUAET(I,J),ANUPAET(I,J)       
 20001              FORMAT (I10, ',',I6, ',', 5F10.2)
 

@@ -195,15 +195,10 @@ Print*, "Please set the first parameter as '1' and '/' in you directory if you a
 !$OMP END PARALLEL DO
 
 ! This is for output result
-
+    PRINT *, 'WATER BALANCE SECTION SUCCEEDED! and RUNNING OUTPUT'
+    
     CALL OUTPUT !(ICELL,IYEAR)  ! Output Annual water and carbon balances
 
-    PRINT *, 'WATER BALANCE SECTION SUCCEEDED!'                              
-           
-    WRITE(*,75)
-75    FORMAT('  CALCULATING FLOW BY LANDCOVER'/)
-
-    ! DEALLOCATE (RUNLAND,ETLAND,GEPLAND)
     PRINT *, '-------------PROGRAM RUN ENDS----------------!'
     Stop
     
