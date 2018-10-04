@@ -18,52 +18,13 @@
       
       REAL AETTEMP, RUNOFFTEMP, PBFTEMP, SBFTEMP,IFTEMP, GEPTEMP,&
             RECOTEMP, NEETEMP
-    !  REAL UZTWC, UZFWC, LZTWC, LZFSC, LZFPC ! soil moisture content parameters    
-      
-      !this is for catchment scale
-      REAL UZTWC_lc(MAX_HUCS), UZFWC_lc(MAX_HUCS), LZTWC_lc(MAX_HUCS), &
-            LZFSC_lc(MAX_HUCS), LZFPC_lc(MAX_HUCS) ! Landuse soil moisture content parameters
-      
-     ! REAL ETUZTW(MAX_YEARS,12), ETLZTW(MAX_YEARS,12), RESIDET(MAX_YEARS,12), ETUZFW(MAX_YEARS,12)
-      
-      !this is for catchment scale
-      REAL ETUZTW_lc(MAX_YEARS,12,MAX_HUCS), ETLZTW_lc(MAX_YEARS,12,MAX_HUCS), &
-           RESIDET_lc(MAX_YEARS,12,MAX_HUCS), ETUZFW_lc(MAX_YEARS,12,MAX_HUCS)
 
-     ! REAL RATLZT, RATLZ
-      !this is for catchment scale
-      REAL RATLZT_lc(MAX_HUCS),RATLZ_lc(MAX_HUCS)
-      
       REAL SNOW,SNOWPACK, SNOWW
       
-       REAL  TAREA
-      
-      !REAL ET(MAX_YEARS,12), GEP(MAX_YEARS,12), &
-       ! RECO(MAX_YEARS,12), NEE(MAX_YEARS,12) 
-      
-      !this is for catchment scale
-      REAL ET_lc(MAX_YEARS,12,MAX_HUCS), GEP_lc(MAX_YEARS,12,MAX_HUCS),&
-        RECO_lc(MAX_YEARS,12,MAX_HUCS), NEE_lc(MAX_YEARS,12,MAX_HUCS)    
-        
+      REAL  TAREA
+
       REAL DPAET
-      
-   !   REAL UZRAT, TWX, PERCM, PERC, DEFR, LZDEF 
-      !this is for catchment scale
-      REAL UZRAT_lc(MAX_HUCS),TWX_lc(MAX_HUCS),PERCM_lc(MAX_HUCS), &
-      PERC_lc(MAX_HUCS), DEFR_lc(MAX_HUCS), LZDEF_lc(MAX_HUCS),  PERCT_lc(MAX_HUCS), PERCF_lc(MAX_HUCS)
-      
-      !REAL PERCT, PERCF
-      
-    !  REAL HPL, RATLP, RATLS, FRACP, PERCP,PERCS
-      !This is for catchment scale
-      REAL HPL_lc(MAX_HUCS), RATLP_lc(MAX_HUCS), RATLS_lc(MAX_HUCS), FRACP_lc(MAX_HUCS)&
-      , PERCP_lc(MAX_HUCS),PERCS_lc(MAX_HUCS)    
-      
-     ! REAL PBF, SBF, INF, SURFRO,INFIL
-      
-      !this si for catchment scale
-      REAL PBF_lc(MAX_HUCS), SBF_lc(MAX_HUCS), INF_lc(MAX_HUCS),SURFRO_lc(MAX_HUCS),INFIL_lc(MAX_HUCS)
-      
+
       REAL TAUZTWC, TAUZFWC, TALZTWC, TALZFPC, TALZFSC
      
       REAL TASM,AUZTWC,AUZFWC,ALZTWC,ALZFPC,ALZFSC,ASM          

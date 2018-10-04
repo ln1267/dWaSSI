@@ -17,51 +17,10 @@
       
       REAL AETTEMP, RUNOFFTEMP, PBFTEMP, SBFTEMP,IFTEMP, GEPTEMP,&
             RECOTEMP, NEETEMP,INTFTEMP
-     ! REAL UZTWC, UZFWC, LZTWC, LZFSC, LZFPC ! soil moisture content parameters    
-      
-      !this is for catchment scale
-      REAL UZTWC_lc(MAX_HUCS), UZFWC_lc(MAX_HUCS), LZTWC_lc(MAX_HUCS), &
-            LZFSC_lc(MAX_HUCS), LZFPC_lc(MAX_HUCS) ! Landuse soil moisture content parameters
-      
-     ! REAL ETUZTW(MAX_YEARS,12), ETLZTW(MAX_YEARS,12), RESIDET(MAX_YEARS,12), ETUZFW(MAX_YEARS,12)
-      
-      !this is for catchment scale
-      REAL ETUZTW_lc(MAX_YEARS,12,MAX_HUCS), ETLZTW_lc(MAX_YEARS,12,MAX_HUCS), &
-           RESIDET_lc(MAX_YEARS,12,MAX_HUCS), ETUZFW_lc(MAX_YEARS,12,MAX_HUCS)
-
-     ! REAL RATLZT, RATLZ
-      !this is for catchment scale
-      REAL RATLZT_lc(MAX_HUCS),RATLZ_lc(MAX_HUCS)
       
       REAL SNOWPACK, SNOWW, INFIL, EXCESS
       
       REAL TAREA
-      
-      !REAL GEP(MAX_YEARS,12), &
-      !  RECO(MAX_YEARS,12), NEE(MAX_YEARS,12) 
-      
-      !this is for catchment scale
-      REAL ET_lc(MAX_YEARS,12,MAX_HUCS), GEP_lc(MAX_YEARS,12,MAX_HUCS),&
-        RECO_lc(MAX_YEARS,12,MAX_HUCS), NEE_lc(MAX_YEARS,12,MAX_HUCS)    
-        
-      
-      !REAL UZRAT, TWX, PERCM, PERC, LZDEF 
-      !this is for catchment scale
-      REAL UZRAT_lc(MAX_HUCS),TWX_lc(MAX_HUCS),PERCM_lc(MAX_HUCS), &
-      PERC_lc(MAX_HUCS), DEFR_lc(MAX_HUCS), LZDEF_lc(MAX_HUCS),  PERCT_lc(MAX_HUCS), PERCF_lc(MAX_HUCS)
-      
-     ! REAL PERCT, PERCF
-      
-     ! REAL HPL, RATLP, RATLS, FRACP, PERCP,PERCS
-      !This is for catchment scale
-      REAL HPL_lc(MAX_HUCS), RATLP_lc(MAX_HUCS), RATLS_lc(MAX_HUCS), FRACP_lc(MAX_HUCS)&
-      , PERCP_lc(MAX_HUCS),PERCS_lc(MAX_HUCS)    
-      
-    !  REAL PBF, SBF, INF, SURFRO,INFIL,EXCESS
-      
-      !this si for catchment scale
-      REAL BF_lc(MAX_HUCS), SBF_lc(MAX_HUCS), SURFRO_lc(MAX_HUCS), &
-      SIF_lc(MAX_HUCS),DEL_lc(MAX_HUCS),SSUR_lc(MAX_HUCS),SPERC_lc(MAX_HUCS)
       
       REAL TAUZTWC, TAUZFWC, TALZTWC, TALZFPC, TALZFSC
      
@@ -82,7 +41,7 @@
                   
         IF (J_S .EQ. 1 .AND. M .EQ. 1) THEN
  
-        
+        LZFSC_lc=0.0
         DO 50 K=1, NLC
                         
            UZTWC_lc(K) = UZTWM(I)
@@ -210,7 +169,7 @@
                  SSUR_lc(K)=0.0
                  SIF_lc(K)=0.0
                  SPERC_lc(K)=0.0 
-                 if (I==1.and.J==45) print*,I,J_S,J,M,K,"start LZFSC_lc=",LZFSC_lc(K)
+!if (I==1.and.J==45) print*,"I=",I,'J=',J,'M=',M,'K=',K,"start LZFSC_lc=",LZFSC_lc(K),"AET=",AET_lc(J, M, K)
 ! -- FOR OPEN WATER, ET=PAET=PET, INFILTRATION IN EXCESS OF ET GOES TO SURFACE RUNOFF
 
       ! IF(K.EQ.8) THEN
@@ -377,7 +336,7 @@
                   
 
 ! --- SET UP INCREMENTAL DO LOOP FOR THE TIME INTERVAL
-if (I==1.and.J==45) print*,I,J,K,"LZFSC_lc=",LZFSC_lc(K),"LZFPC_lc=",LZFPC_lc(K),DLZP
+!if (I==1.and.J==45) print*,"I=",I,'J=',J,'M=',M,'K=',K,"middle LZFSC_lc=",LZFSC_lc(K)
       DO 450 F=1,NINC
       
       EXCESS=0.
@@ -601,7 +560,6 @@ if (I==1.and.J==45) print*,I,J,K,"LZFSC_lc=",LZFSC_lc(K),"LZFPC_lc=",LZFPC_lc(K)
 480   SSUR_lc(K)=SSUR_lc(K)+PINC+UZFWC_lc(K)-UZFWM(I)+EXCESS
                           
       UZFWC_lc(K)=UZFWM(I)
-
 450   CONTINUE
    ! if (I==1.and.J==45)       print*,K,BF_lc(K),  SBF_lc(K)
  
@@ -680,7 +638,7 @@ if (I==1.and.J==45) print*,I,J,K,"LZFSC_lc=",LZFSC_lc(K),"LZFPC_lc=",LZFPC_lc(K)
                    
               TAREA = TAREA + LADUSE_lc(I,K) 
 
-    if (I==1.and.J==45) print*,I,J,M,K,"END LZFSC_lc=",LZFSC_lc(K)
+! if (I==1.and.J==45) print*,"I=",I,'J=',J,'M=',M,'K=',K,"END LZFSC_lc=",LZFSC_lc(K)
 40         CONTINUE ! end of land cover
 
            
@@ -720,6 +678,6 @@ if (I==1.and.J==45) print*,I,J,K,"LZFSC_lc=",LZFSC_lc(K),"LZFPC_lc=",LZFPC_lc(K)
            GEPM(I,J, M) = GEPTEMP
            RECOM(I,J,M)  = RECOTEMP
            NEEM(I,J,M) = NEETEMP
-            if (I==1 .and. J==45) print*,I,J,M,RUNOFF(I,J,M), SECBF(I,J,M), INTF(I,J,M), HUCAREA(I)
+!if (I==1 .and. J==45) print*,I,J,M,RUNOFF(I,J,M), SECBF(I,J,M), INTF(I,J,M), HUCAREA(I)
       RETURN
       END
