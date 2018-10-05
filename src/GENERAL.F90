@@ -4,10 +4,6 @@ PROGRAM WaSSICBZB
     use common_var
 
     implicit none 
-           
-    !REAL,POINTER:: RUNLAND(:,:,:,:),ETLAND(:,:,:,:),GEPLAND(:,:,:,:)
-    ! OpenMP variables
-    !INTEGER TID,NTHREADS,OMP_GET_THREAD_NUM,OMP_GET_NUM_THREADS,REM,ST_INDX
 
     INTEGER ICELL,ICOUNT,IYEAR,MONTHD(12),MONTHL(12)
     INTEGER YEAR,NDAY,IM,MNDAY
@@ -26,7 +22,7 @@ PROGRAM WaSSICBZB
     ! --- Write introductory information to screen
     WRITE(*,10)
 10 FORMAT(' *************************************************'//,&
-            '                   *** Revised Gridded daily WaSSI-CB by Ning Liu  ***'//,&
+            '                   *** Revised Gridded OR CATCHMENT SCALE Monthly WaSSI-CB by Ning Liu  ***'//,&
        '   Water Supply Stress Index Modeling System'//,&
        ' Eastern Forest Environmental Threat Assessment Center'/,&
          ' USDA Forest Service Southern Research Station '/,&
@@ -51,15 +47,14 @@ Print*, "Please set the first parameter as '1' and '/' in you directory if you a
     WRITE(*,*) 'OUTPUT files will be written in directory ',TRIM(OUTPATH),NEW_LINE('A')    
     
     IF (ARCH == '1')  then 
+	
         Print*,"LINUX system was selected",NEW_LINE('A')
-        
-        !!!!-----------Open files------------------   
         !!! This is for Linux  
         
         !--Open Input files----------------------------------------------
         OPEN(1,FILE=TRIM(INPATH)//'/GENERAL.TXT')
         OPEN(2,FILE=TRIM(INPATH)//'/CELLINFO.TXT') 
-        !OPEN(3,FILE=TRIM(INPATH)//'/vegINFO.TXT')
+        !OPEN(3,FILE=TRIM(INPATH)//'/VEGINFO.TXT') ! DYNAMIC VEGETATION TYPE INPUT
         OPEN(4,FILE=TRIM(INPATH)//'/CLIMATE.TXT')
         OPEN(7,FILE=TRIM(INPATH)//'/SOILINFO.TXT')
         OPEN(8,FILE=TRIM(INPATH)//'/LANDLAI.TXT')
@@ -70,26 +65,20 @@ Print*, "Please set the first parameter as '1' and '/' in you directory if you a
         OPEN(78,FILE=TRIM(OUTPATH)//'/MONTHFLOW.TXT')
         OPEN(79,FILE=TRIM(OUTPATH)//'/ANNUALFLOW.TXT')
         OPEN(80,FILE=TRIM(OUTPATH)//'/HUCFLOW.TXT')
-        !      OPEN(99,FILE=TRIM(OUTPATH)//'/ceshi.TXT')
         OPEN(400,FILE=TRIM(OUTPATH)//'/MONTHCARBON.TXT')
         OPEN(500,FILE=TRIM(OUTPATH)//'/ANNUALCARBON.TXT')
         OPEN(600,FILE=TRIM(OUTPATH)//'/HUCCARBON.TXT')
-        !      OPEN(700,FILE=TRIM(OUTPATH)//'/ANNUALBIO.TXT')
-        !      OPEN(800,FILE=TRIM(OUTPATH)//'/HUCBIO.TXT')    
         OPEN(900,FILE=TRIM(OUTPATH)//'/SOILSTORAGE.TXT')
-        !      OPEN(910,FILE=TRIM(OUTPATH)//'/RUNOFFBYLANDUSE.TXT')
-        !      OPEN(920,FILE=TRIM(OUTPATH)//'/FLOWVOLBYLANDUSE.TXT')     
-        !      OPEN(1000,FILE=TRIM(OUTPATH)//'/RUNLAND.TXT')
-        ! --- Open Output FILES (WARMUP.FOR)
-        OPEN(2002,FILE=TRIM(OUTPATH)//'/DATA_V_F.TXT') 
-        OPEN(2003,FILE=TRIM(OUTPATH)//'/VALIDATION.TXT') 
-    ELSEIF (ARCH /= '1') THEN  
+
+    ELSEIF (ARCH /= '1') THEN
+	
         Print*,"Windows system was selected",NEW_LINE('A')
-    !!! This is for Windows
+    
+	!!! This is for Windows
     !!--Open Input files------------------ 
         OPEN(1,FILE=TRIM(INPATH)//'\GENERAL.TXT')
         OPEN(2,FILE=TRIM(INPATH)//'\CELLINFO.TXT') 
-        !!      OPEN(3,FILE=TRIM(INPATH)//'\vegINFO.TXT')
+        !OPEN(3,FILE=TRIM(INPATH)//'\VEGINFO.TXT') ! DYNAMIC VEGETATION TYPE INPUT
         OPEN(4,FILE=TRIM(INPATH)//'\CLIMATE.TXT')
         OPEN(7,FILE=TRIM(INPATH)//'\SOILINFO.TXT')
         OPEN(8,FILE=TRIM(INPATH)//'\LANDLAI.TXT')
@@ -99,20 +88,13 @@ Print*, "Please set the first parameter as '1' and '/' in you directory if you a
         OPEN(78,FILE=TRIM(OUTPATH)//'\MONTHFLOW.TXT')
         OPEN(79,FILE=TRIM(OUTPATH)//'\ANNUALFLOW.TXT')
         OPEN(80,FILE=TRIM(OUTPATH)//'\HUCFLOW.TXT')
-        OPEN(99,FILE=TRIM(OUTPATH)//'\ceshi.TXT')
         OPEN(400,FILE=TRIM(OUTPATH)//'\MONTHCARBON.TXT')
         OPEN(500,FILE=TRIM(OUTPATH)//'\ANNUALCARBON.TXT')
         OPEN(600,FILE=TRIM(OUTPATH)//'\HUCCARBON.TXT')
         OPEN(900,FILE=TRIM(OUTPATH)//'\SOILSTORAGE.TXT')
-        !!      OPEN(910,FILE=TRIM(OUTPATH)//'\RUNOFFBYLANDUSE.TXT')
-        !!      OPEN(920,FILE=TRIM(OUTPATH)//'\FLOWVOLBYLANDUSE.TXT')     
-        !!      OPEN(1000,FILE=TRIM(OUTPATH)//'\RUNLAND.TXT')
-        !! --- Open Output FILES (WARMUP.FOR)
-        OPEN(2002,FILE=TRIM(OUTPATH)//'\DATA_V_F.TXT')
-        OPEN(2003,FILE=TRIM(OUTPATH)//'\WATERBALANCE.TXT')
      
     ELSE
-       
+
         Print*,"Please input 1 for LINUX or 2 for Windows after the program: eg './aout 1 ../in ../out'"
     ENDIF  
  
@@ -126,7 +108,6 @@ Print*, "Please set the first parameter as '1' and '/' in you directory if you a
     
     CALL RPSINT      ! Read Landuse, elevation and Soil parameters
           
-!    CALL RPSWATERUSE  ! Read HUC area, elevation, and slope
     print*,"finish read Land cover  data",NEW_LINE('A')
       
     CALL RPSLAI     ! Read LAI data
@@ -144,10 +125,6 @@ Print*, "Please set the first parameter as '1' and '/' in you directory if you a
 
 !          
 !----------------------Modelling for each Cell and year start------------------------------------  
-
-      ! ALLOCATE (RUNLAND(NGRID,NYEAR_S+NWARMUP,12,31))
-      ! ALLOCATE (ETLAND(NGRID,NYEAR_S+NWARMUP,12,31))
-      ! ALLOCATE (GEPLAND(NGRID,NYEAR_S+NWARMUP,12,31))
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ICELL,IYEAR,IM,MNDAY)          
     DO 200 ICELL=1,NGRID       
@@ -170,9 +147,9 @@ Print*, "Please set the first parameter as '1' and '/' in you directory if you a
                ELSE
                  MNDAY=MONTHL(IM)
                ENDIF
-              ! PRINT*,IYEAR,"OK1"          
+        
                CALL WARMPET(ICELL, IYEAR, IM, MNDAY)  ! Caculate MONTHLY PET AND POTENTIAL AET 
-               !PRINT*,IYEAR,"OK2"  
+
                IF (modelscale .eq. 0) THEN
                
                     CALL WATERBAL_MON_LC(ICELL, IYEAR, IM) ! monthly SMA-SAC

@@ -26,7 +26,7 @@
 
 !----Set the simulate ID for the start year
             J=J_S+IYSTART-1-NWARMUP
-            !print*,J
+
 ! --- Calculate Monthly potential evapotranspiration
                          
             DTEMP=TEMP(I,J,M)

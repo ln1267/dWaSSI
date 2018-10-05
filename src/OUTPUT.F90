@@ -32,12 +32,12 @@
     
                 
     !VALIDATION.TXT
-                WRITE(2003,2325) I,IDY,IM,RAIN(I,J,IM),SP(I,J,IM), PET(I,J,IM), &
-                AET(I,J,IM),PAET(I,J,IM),RUNOFF(I,J,IM),PRIBF(I,J,IM),SECBF(I,J,IM),&
-                INTF(I,J,IM),AVSMC(I,J,IM),EMUZTWC(I,J,IM), EMUZFWC(I,J,IM),&
-                    EMLZTWC(I,J,IM), EMLZFPC(I,J,IM), EMLZFSC(I,J,IM)
+                ! WRITE(2003,2325) I,IDY,IM,RAIN(I,J,IM),SP(I,J,IM), PET(I,J,IM), &
+                ! AET(I,J,IM),PAET(I,J,IM),RUNOFF(I,J,IM),PRIBF(I,J,IM),SECBF(I,J,IM),&
+                ! INTF(I,J,IM),AVSMC(I,J,IM),EMUZTWC(I,J,IM), EMUZFWC(I,J,IM),&
+                    ! EMLZTWC(I,J,IM), EMLZFPC(I,J,IM), EMLZFSC(I,J,IM)
                     
-2325            FORMAT (I10, I6, I4,15F10.1)  
+! 2325            FORMAT (I10, I6, I4,15F10.1)  
       
     !MONTHFLOW.TXT                   
                 WRITE(78,2025) I,IDY, IM, RAIN(I,J,IM),TEMP(I,J,IM),&
@@ -52,13 +52,8 @@
 
                WRITE(900,2035)  HUCNO(I), IDY, IM, AVUZTWC(I,J,IM), AVUZFWC(I,J,IM),&
                     AVLZTWC(I,J,IM), AVLZFPC(I,J,IM), AVLZFSC(I,J,IM)
-        
-        ! TEST OUTPUT        
-!                WRITE(*,2035)  HUCNO(I), IDY, IM, AVUZTWC(I,J,IM), AVUZFWC(I,J,IM),&
-!                   AVLZTWC(I,J,IM), AVLZFPC(I,J,IM)  
-                  
-2035            FORMAT(I10, ',', I6, ',',I6, ',',F8.1, ',', F8.1,',' F8.1, ',',F8.1, ',',F8.1)
-  
+2035           FORMAT (I10, ',',I6, ',', I6, ',', 5F10.2)       
+
     !MONTHCARBON.TXT
                 WRITE (400, 2000) HUCNO(I), IDY, IM, GEPM(I,J, IM), &
                 RECOM(I,J,IM), NEEM(I,J,IM)         

@@ -18,16 +18,15 @@
       
       REAL AETTEMP, RUNOFFTEMP, PBFTEMP, SBFTEMP,IFTEMP, GEPTEMP,&
             RECOTEMP, NEETEMP
+			
       REAL UZTWC, UZFWC, LZTWC, LZFSC, LZFPC ! soil moisture content parameters    
          
       REAL ETUZTW(MAX_YEARS,12), RESIDET(MAX_YEARS,12), ETUZFW(MAX_YEARS,12)
       
       REAL ETLZTW(MAX_YEARS,12), RATLZT, RATLZ
       
-      REAL SNOW,SNOWPACK, SNOWW
-      
-      !REAL LTASM, TAREA
-      
+      REAL SNOW, SNOWW
+            
       REAL ET(MAX_YEARS,12), SURFRO, GEP(MAX_YEARS,12), INFIL,&
         RECO(MAX_YEARS,12), NEE(MAX_YEARS,12) 
       
@@ -42,12 +41,7 @@
       REAL PBF, SBF, INF
       
       REAL TAUZTWC, TAUZFWC, TALZTWC, TALZFPC, TALZFSC, TASM
-     
-     ! REAL ,AUZTWC,AUZFWC,ALZTWC,ALZFPC,ALZFSC,ASM           
-            ! TAREA,TAREA,TAUZTWC,TAUZFWC,TALZTWC,TALZFPC,TALZFSC
-           
-     ! INTEGER GEPFLAG
-      
+   
     !REAL :: RUNLAND(NGRID,NYEAR_S+NWARMUP,12,31)
     !REAL :: ETLAND(NGRID,NYEAR_S+NWARMUP,12,31)
     !REAL :: GEPLAND(NGRID,NYEAR_S+NWARMUP,12,31) 
@@ -82,25 +76,7 @@
            LZFSC = 0.75*LZFSM(I)
            LZFPC = 0.75*LZFPM(I)
            SNOWPACK=0.0
-        ! ELSE
-            ! IF(M .EQ. 1) then
-            ! IAM =0                          
-               ! UZTWC = EMUZTWC(I,J-1,12)
-               ! UZFWC = EMUZFWC(I,J-1,12)
-               ! LZTWC = EMLZTWC(I,J-1,12)
-               ! LZFSC = EMLZFSC(I,J-1,12)
-               ! LZFPC = EMLZFPC(I,J-1,12)
-               ! SNOWPACK=SP(I,J-1,12)
-            ! ELSE
-            ! IAM =0
-               ! UZTWC = EMUZTWC(I,J,M-1)
-               ! UZFWC = EMUZFWC(I,J,M-1)
-               ! LZTWC = EMLZTWC(I,J,M-1)
-               ! LZFSC = EMLZFSC(I,J,M-1)
-               ! LZFPC = EMLZFPC(I,J,M-1)
-               ! SNOWPACK=SP(I,J,M-1)
-            ! ENDIF
-        
+
         ENDIF 
          
 ! *****************************************************************************************************
@@ -197,12 +173,6 @@
                    SBF = SBF + LZFSC
                    LZFSC = 0.0
                 ENDIF  
-
-! Test Output
-!
-!Write(*,9881) 
-!9881 Format("Check the following variables: SNOWPACK; PBF;SBF")
-!Write(*,*) I,J,M,SNOWPACK,PBF,SBF
 
         ELSE
                   
@@ -307,12 +277,6 @@
                    LZFSC = 0.0
                    
 230                IF (LZTWC .LT. 0.00001) LZTWC = 0.0
-
-! Test Output
-!
-!Write(*,9882) 
-!9882 Format("Check the following variables: LZTWC; LZFSC;LZFPC;UZFWC,ETLZTW,ETUZTW),ETUZFW")
-!Write(*,*) I,J,M,LZTWC,LZFSC,LZFPC,UZTWC,UZFWC,ETLZTW(J,M),ETUZTW(J,M),ETUZFW(J,M)
 
 
 ! --- CALCULATE TOTAL ET SUPPLIED BY UPPER AND LOWER LAYERS
@@ -564,11 +528,6 @@
 !Print *, 'Finish calculate Water balances and Soil Water Content'        
 ! **************************----Finish calculate Water balances and Soil water--------******************************************************
 
-
-! for check
-!WRITE(99,*) I,J,M,Day,' ET=', ET(J,M),'TEMP=',TEMP (I,J, M),'UZTWC=',UZTWC,'PBF=',PBF,'SBF=',SBF,'LZFPC=',LZFPC ,&
-!'LZFSC=',LZFSC,'UZFWC=', UZFWC,'SURFRO=', SURFRO,'INF=', INF
-
 ! *****************************************************************************************************
     ! Calculate GEP based on ET and the equation
         IF (LC_N .LE. 0) THEN 
@@ -701,19 +660,6 @@
 ! -- STREAMFLOW IN MILLION M3 FOR EACH HUC FOR MONTH M. HUCAREA IN SQ. METERS 
         STRFLOW(I, J, M) = (RUNOFF(I,J,M) + PRIBF(I,J,M) + SECBF(I,J,M) + INTF(I,J,M))*1/1000. 
         ! 64=8*8 8 is the area of each cell (KM2)
-
-
-! TEST OUTPUT
-
-!WRITE(99,*) 'ICELL=',I,'Year=',J,'Month=',M,'TEMP=',TEMP(I,J,M),'RAINFALL=',RAIN(I,J,M),'AET=',AET(M),'RUNOFF=',RUNOFF(M),&
-!'INTF=',INTF(M),'SMC=',SMC (M),'SP=',SP(M), 'PRIBF=',PRIBF(M),'SECBF=',SECBF(M),&
-!    'AVUZTWC=',AVUZTWC(M),'AVUZFWC=',AVLZTWC(M),'AET=',AVLZTWC(M),&
-!    'AVLZFPC=',AVLZFPC(M),'AVLZFSC=',AVLZFSC(M),'GEPM=',GEPM(I,J, M) 
-!12133 format(I6,I6,I4,13F10.3)
-! --- Return
-
-! Deallocates array RUNLAND,ETLAND,GEPLAND
-      
 
       RETURN
       END
