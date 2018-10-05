@@ -155,7 +155,7 @@ Print*, "Please set the first parameter as '1' and '/' in you directory if you a
                     CALL WATERBAL_MON_LC(ICELL, IYEAR, IM) ! monthly SMA-SAC
                     !CALL WATERBAL_LC(ICELL, IYEAR, IM, MNDAY) ! Average daily SMA-SAC
                 ELSE
-                    CALL WATERBAL(ICELL, IYEAR, IM, MNDAY) ! Caculate MONTHLY GPP and ET
+                    CALL WATERBAL_MON(ICELL, IYEAR, IM) ! Caculate MONTHLY GPP and ET
                 ENDIF
 400         CONTINUE ! END LOOP MONTH        
 

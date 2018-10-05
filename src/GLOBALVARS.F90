@@ -143,8 +143,10 @@
             SIF_lc(MAX_HUCS),DEL_lc(MAX_HUCS),SSUR_lc(MAX_HUCS),SPERC_lc(MAX_HUCS),&
             PBF_lc(MAX_HUCS), INF_lc(MAX_HUCS),INFIL_lc(MAX_HUCS)      
 
-
-      end
+! Soil mositure for GRID
+      REAL  UZTWC,UZFWC,LZTWC,LZFPC,LZFSC
+      COMMON/SOILFRID/UZTWC,UZFWC,LZTWC,LZFPC,LZFSC
+end
 
 
 !**************---Program Starting--------*************************
