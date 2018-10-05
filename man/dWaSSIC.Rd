@@ -4,27 +4,17 @@
 \alias{dWaSSIC}
 \title{Parallel wrap of WaSSI-C model}
 \usage{
-dWaSSIC(str.date = NULL, end.date = NULL, warmup = 3, mcores = 1,
-  str.date.climate = NULL, end.date.climate = NULL,
-  str.date.lai = NULL, end.date.lai = NULL, par.sacsma = NULL,
+dWaSSIC(sim.dates, warmup = 3, mcores = 1, par.sacsma = NULL,
   par.petHamon = NULL, hru.info = NULL, clim.prcp = NULL,
   clim.tavg = NULL, hru.lai = NULL, hru.lc.lai = NULL,
   huc.lc.ratio = NULL)
 }
 \arguments{
-\item{str.date}{vector of mean daily temperature (deg C)}
-
-\item{end.date}{latitude ()}
+\item{sim.dates}{list of all dates}
 
 \item{warmup}{years for warming up WaSSI-C model}
 
 \item{mcores}{how many cores using for simulation}
-
-\item{str.date.climate}{a day number of the year (julian day of the year)}
-
-\item{end.date.climate}{a day number of the year (julian day of the year)}
-
-\item{str.date.lai}{start of the lai data}
 }
 \value{
 outputs potential evapotranspiration (mm day-1)
@@ -37,8 +27,7 @@ For details see Haith and Shoemaker (1987)
 }
 \examples{
 \dontrun{
-distHydroSim(str.date = str_date, end.date = end_date,
-             str.date.climate =str_date, end.date.climate  = end_date,
+distHydroSim(sim.dates = sim_dates,
              hru.par = hru_par, hru.info = hru_info, hru.elevband = NULL,
              clim.prcp = stcroix$prcp.grid, clim.tavg = stcroix$tavg.grid,
              snow.flag = 0, progress.bar = TRUE)

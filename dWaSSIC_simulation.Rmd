@@ -1,5 +1,5 @@
 ---
-title: "dWaSSI-C document"
+title: "dWaSSIC document"
 output: 
   html_notebook: 
     number_sections: yes
@@ -33,91 +33,91 @@ f_lib_check(c("raster","reshape2","parallel","lubridate"))
 ```
 
 # Test run
-```{r,eval=F}
-Climate<-read.csv("~/dWaSSIC_R/tmp/CLIMATE.TXT")
-LAI<-read.csv("~/dWaSSIC_R/tmp/LANDLAI.TXT")
-SOIL<-read.csv("~/dWaSSIC_R/tmp/SOILINFO.TXT")
-HUC<-read.csv("~/dWaSSIC_R/tmp/CELLINFO.TXT")
-
 Climate<-read.csv("~/Downloads/FOR_NING/INPUTS/R1_PRISM_CLIMATE.TXT")
 LAI<-read.csv("~/Downloads/FOR_NING/INPUTS/LANDLAI_CONUSF2F.txt")
 SOIL<-read.csv("~/Downloads/FOR_NING/INPUTS/SOILINFO_US_HUC12.TXT")
 HUC<-read.csv("~/Downloads/FOR_NING/INPUTS/CELLINFO_CONUSF2F.txt")
-
-names(Climate)<-c("BasinID","Year","Month","Ppt_mm","Tavg_C")
-names(SOIL)[1]<-c("BasinID")
-
-names(LAI)[1:2]<-c("BasinID","Year")
-names(HUC)[1:2]<-c("ID","BasinID")
-
 LAI<-cbind(Year=2000,LAI)
 names(LAI)[2:3]<-c("BasinID","Month")
 names(HUC)[1]<-c("BasinID")
 
+## Read input
+```{r,eval=F}
+Climate<-read.csv("INPUTS/Inputs_catchment/CLIMATE.TXT")
+LAI<-read.csv("INPUTS/Inputs_catchment/LANDLAI.TXT")
+SOIL<-read.csv("INPUTS/Inputs_catchment/SOILINFO.TXT")
+HUC<-read.csv("INPUTS/Inputs_catchment/CELLINFO.TXT")
+
+names(Climate)<-c("BasinID","Year","Month","Ppt_mm","Tavg_C")
+names(SOIL)[1:2]<-c("ID","BasinID")
+
+names(LAI)[1:2]<-c("BasinID","Year")
+names(HUC)[1:2]<-c("ID","BasinID")
+
+huc_lc_ratio<-as.matrix(HUC[c(4:length(HUC[1,]))])
+hru_info<-HUC[c(1:3)]
+names(hru_info)<-c("BasinID","HRU_Lat","HRU_Lon")
+
 # Filter data based on climate data
-BasinIDs<-unique(Climate$BasinID)[1:100]
+BasinIDs<-unique(Climate$BasinID)
 NBasins<-length(BasinIDs)
 
 Climate<-Climate[Climate$BasinID %in% BasinIDs,]
 HUC<-HUC[HUC$BasinID %in% BasinIDs,]
 LAI<-LAI[LAI$BasinID %in% BasinIDs,]
 SOIL<-SOIL[SOIL$BasinID %in% BasinIDs,]
+```
 
+## Set period for simulation
+```{r}
 # Set period for simulation
-str_date <- as.Date("2001/01/01") 
-end_date <- as.Date("2012/12/01") 
+Sim_dates<-list()
+
+Sim_dates[["Start"]] <- as.Date("2004/01/01")
+Sim_dates[["End"]] <- as.Date("2012/12/01" )
 
 # Climate time range
-str_date_input <- as.Date(paste0(min(Climate$Year),"/01/01"))
-end_date_input <- as.Date(paste0(max(Climate$Year),"/12/01"))
-
+Sim_dates[["Start_climate"]] <- as.Date(paste0(min(Climate$Year),"/01/01"))
+Sim_dates[["End_climate"]] <- as.Date(paste0(max(Climate$Year),"/12/01"))
 
 # LAI time range
-str_date_lai <- as.Date(paste0(min(LAI$Year),"/01/01")) 
-end_date_lai <- as.Date(paste0(max(LAI$Year),"/12/01")) 
+Sim_dates[["Start_lai"]] <- as.Date(paste0(min(LAI$Year),"/01/01") )
+Sim_dates[["End_lai"]] <- as.Date(paste0(max(LAI$Year),"/12/01"))
 
-seq_date<-seq.Date(str_date,end_date,by = "month")
-seq_datef<-seq.Date(str_date_input,end_date_input,by = "month")
-sim_ind <-which(seq_datef %in% seq_date)
+Sim_dates[["Seq_date"]]<-seq.Date(as.Date(Sim_dates[["Start"]]),as.Date(Sim_dates[["End"]]),by = "month")
+Sim_dates[["Seq_date_climate"]]<-seq.Date(Sim_dates[["Start_climate"]],Sim_dates[["End_climate"]],by = "month")
+Sim_dates[["Sim_ind"]] <-which(Sim_dates[["Seq_date_climate"]] %in% Sim_dates[["Seq_date"]])
 
-par_sacsma   = as.matrix(SOIL[,2:12] )
+```
+## Convert input parameters
+```{r}
+## Soil parameters
+par_sacsma   = as.matrix(SOIL[,3:13] )
 colnames(par_sacsma)<-toupper(colnames(par_sacsma))
-par_petHamon = rep(1,NBasins)
-# par_snow17   = stcroix$hru.par[,18:27] 
-# par_routLah  = stcroix$hru.par[,28:31] 
 
+## PET parameters
+par_petHamon = rep(1,NBasins)
+
+## Input climate data
 clim_prcp<-matrix(Climate$Ppt_mm,ncol=NBasins)
 clim_tavg<-matrix(Climate$Tavg_C,ncol=NBasins)
 
+## Input LAI and ratio for each vegetation type
+huc_lc_ratio<-as.matrix(HUC[c(6:length(HUC[1,]))])
 hru_lc_lai<-lapply(BasinIDs, function(x) as.matrix(subset(LAI,BasinID==x)[c(4:length(LAI[1,]))]))
 
-huc_lc_ratio<-as.matrix(HUC[c(8:length(HUC[1,]))])
-hru_info<-HUC[c(1:7)]
-names(hru_info)<-c("ID","BasinID","HRU_Area","HRU_Lat","HRU_Lon","HRU_Elev(m)","HRU_FlowLen(m)")
+## Hru info like Lat, long and elevation for each HUC
+hru_info<-HUC[c(1:5)]
+names(hru_info)<-c("ID","BasinID","HRU_Area","HRU_Lat","HRU_Lon")#,"HRU_Elev(m)","HRU_FlowLen(m)")
+```
 
-huc_lc_ratio<-as.matrix(HUC[c(4:length(HUC[1,]))])
-hru_info<-HUC[c(1:3)]
-names(hru_info)<-c("BasinID","HRU_Lat","HRU_Lon")
-
-
-flowR <- dWaSSIC(str.date = str_date, end.date = end_date, warmup = 3,mcores = 3,
-             str.date.climate =str_date_input, end.date.climate  = end_date_input, 
+## Run the simulation using dWaSSIC funtion
+```{r}
+flowR <- dWaSSIC(sim.dates=Sim_dates, warmup = 3,mcores = 3,
              par.sacsma = par_sacsma,par.petHamon=par_petHamon, 
              hru.info = hru_info, 
              clim.prcp = clim_prcp, clim.tavg = clim_tavg,
-             hru.lai=NULL,hru.lc.lai=hru_lc_lai,huc.lc.ratio=huc_lc_ratio,
-             str.date.lai =str_date_lai, end.date.lai  = end_date_lai) 
-
-
-
-flowR <- distHydroSim(str.date = str_date, end.date = end_date, 
-             str.date.climate =str_date_input, end.date.climate  = end_date_input, 
-             par.sacsma = par_sacsma,par.petHamon=par_petHamon, par.snow17=par_snow17,par.routLah=par_routLah,
-             hru.info = hru_info, hru.elevband = NULL, 
-             clim.prcp = clim_prcp, clim.tavg = clim_tavg,
-             hru.lai=NULL,hru.lc.lai=hru_lc_lai,huc.lc.ratio=huc_lc_ratio,
-             str.date.lai =str_date_lai, end.date.lai  = end_date_lai, 
-             snow.flag = 0, progress.bar = TRUE,month=T) 
+             hru.lai=NULL,hru.lc.lai=hru_lc_lai,huc.lc.ratio=huc_lc_ratio) 
 
 Rain_mean<-apply(clim_prcp, 1, mean,na.rm=T)
 df <- data_frame(date = seq_date,Totflow=flowR$OUT$tot, TotET=flowR$OUT$totaet,Srufflow = flowR$SURF,Baseflow=flowR$BASE,Rain=Rain_mean[sim_ind])
