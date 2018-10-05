@@ -109,27 +109,26 @@ hru_lc_lai<-lapply(BasinIDs, function(x) as.matrix(subset(LAI,BasinID==x)[c(4:le
 ## Hru info like Lat, long and elevation for each HUC
 hru_info<-HUC[c(1:5)]
 names(hru_info)<-c("ID","BasinID","HRU_Area","HRU_Lat","HRU_Lon")#,"HRU_Elev(m)","HRU_FlowLen(m)")
+hru_info["HRU_Elev(m)"]<-1000
+hru_info["HRU_FlowLen(m)"]<-1000
+
+library(sacsmaR)
+par_routing<-stcroix$hru.par[1:22,28:31]
+
 ```
 
 ## Run the simulation using dWaSSIC funtion
 ```{r}
 flowR <- dWaSSIC(sim.dates=Sim_dates, warmup = 3,mcores = 3,
-             par.sacsma = par_sacsma,par.petHamon=par_petHamon, 
+             par.sacsma = par_sacsma,par.petHamon=par_petHamon,par.routing =par_routing, 
              hru.info = hru_info, 
              clim.prcp = clim_prcp, clim.tavg = clim_tavg,
              hru.lai=NULL,hru.lc.lai=hru_lc_lai,huc.lc.ratio=huc_lc_ratio) 
 
 Rain_mean<-apply(clim_prcp, 1, mean,na.rm=T)
-df <- data_frame(date = seq_date,Totflow=flowR$OUT$tot, TotET=flowR$OUT$totaet,Srufflow = flowR$SURF,Baseflow=flowR$BASE,Rain=Rain_mean[sim_ind])
-ggplot(df, aes(date, Totflow)) + geom_line() + labs(x = "", y = "Surface flow (mm/month)")
-ggplot(df, aes(date, Rain)) + geom_line() + labs(x = "", y = "Rain (mm/month)")
-ggplot(df1, aes(date, Totflow)) + geom_line() + labs(x = "", y = "Surface flow (mm/month)")
-ggplot(df, aes(date, TotET)) + geom_line() + labs(x = "", y = "ET (mm/month)")
-ggplot(df1, aes(date, TotET)) + geom_line() + labs(x = "", y = "ET (mm/month)")
-ggplot(df, aes(date, Rain)) + geom_line() + labs(x = "", y = "Rain (mm/month)")
-ggplot(df1, aes(date, Baseflow)) + geom_line() + labs(x = "", y = "Rain (mm/month)")
-plot(df$Baseflow,df$Rain)
-df1 <- data_frame(date = seq_date,Totflow=flowR1$OUT$tot, TotET=flowR1$OUT$totaet,Srufflow = flowR1$SURF,Baseflow=flowR1$BASE,Rain=Rain_mean[589:744])
+df <- data.frame(date = Sim_dates$Seq_date,Srufflow = flowR$FLOW_SURF,Baseflow=flowR$FLOW_BASE)
+ggplot(df, aes(date, Srufflow)) + geom_line() + labs(x = "", y = "Surface flow (mm/month)")
+ggplot(df, aes(date, Baseflow)) + geom_line() + labs(x = "", y = "Base flow  (mm/month)")
 
 ```
 

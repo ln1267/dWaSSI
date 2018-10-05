@@ -4,23 +4,14 @@
 \alias{distHydroSim}
 \title{Distribution wrap of dWaSSI-C}
 \usage{
-distHydroSim(str.date = NULL, end.date = NULL, warmup = 3,
-  str.date.climate = NULL, end.date.climate = NULL,
-  str.date.lai = NULL, end.date.lai = NULL, par.sacsma = NULL,
-  par.petHamon = NULL, par.snow17 = NULL, par.routLah = NULL,
-  hru.info = NULL, hru.elevband = NULL, clim.prcp = NULL,
-  clim.tavg = NULL, hru.lai = NULL, hru.lc.lai = NULL,
-  huc.lc.ratio = NULL, snow.flag = 0, progress.bar = TRUE,
-  month = F)
+distHydroSim(sim.dates, par.sacsma = NULL, par.petHamon = NULL,
+  par.snow17 = NULL, par.routLah = NULL, hru.info = NULL,
+  hru.elevband = NULL, clim.prcp = NULL, clim.tavg = NULL,
+  hru.lai = NULL, hru.lc.lai = NULL, huc.lc.ratio = NULL,
+  snow.flag = 0, progress.bar = TRUE, month = F)
 }
 \arguments{
-\item{str.date}{vector of mean daily temperature (deg C)}
-
-\item{end.date}{latitude ()}
-
-\item{str.date.climate}{a day number of the year (julian day of the year)}
-
-\item{end.date.climate}{a day number of the year (julian day of the year)}
+\item{sim.dates}{list of all dates}
 }
 \value{
 outputs potential evapotranspiration (mm day-1)
@@ -33,8 +24,7 @@ For details see Haith and Shoemaker (1987)
 }
 \examples{
 \dontrun{
-distHydroSim(str.date = str_date, end.date = end_date,
-             str.date.climate =str_date, end.date.climate  = end_date,
+distHydroSim(str.date,
              hru.par = hru_par, hru.info = hru_info, hru.elevband = NULL,
              clim.prcp = stcroix$prcp.grid, clim.tavg = stcroix$tavg.grid,
              snow.flag = 0, progress.bar = TRUE)

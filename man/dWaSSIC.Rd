@@ -5,9 +5,9 @@
 \title{Parallel wrap of WaSSI-C model}
 \usage{
 dWaSSIC(sim.dates, warmup = 3, mcores = 1, par.sacsma = NULL,
-  par.petHamon = NULL, hru.info = NULL, clim.prcp = NULL,
-  clim.tavg = NULL, hru.lai = NULL, hru.lc.lai = NULL,
-  huc.lc.ratio = NULL)
+  par.petHamon = NULL, par.routing = NULL, hru.info = NULL,
+  clim.prcp = NULL, clim.tavg = NULL, hru.lai = NULL,
+  hru.lc.lai = NULL, huc.lc.ratio = NULL)
 }
 \arguments{
 \item{sim.dates}{list of all dates}

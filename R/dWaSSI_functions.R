@@ -3,16 +3,12 @@
 # Distributed wrap of dWaSSI model----
 #' @title Distribution wrap of dWaSSI-C
 #' @description FUNCTION_DESCRIPTION
-#' @param str.date  vector of mean daily temperature (deg C)
-#' @param end.date latitude ()
-#' @param str.date.climate a day number of the year (julian day of the year)
-#' @param end.date.climate a day number of the year (julian day of the year)
+#' @param sim.dates  list of all dates
 #' @return outputs potential evapotranspiration (mm day-1)
 #' @details For details see Haith and Shoemaker (1987)
 #' @examples
 #' \dontrun{
-#' distHydroSim(str.date = str_date, end.date = end_date,
-#'              str.date.climate =str_date, end.date.climate  = end_date,
+#' distHydroSim(str.date,
 #'              hru.par = hru_par, hru.info = hru_info, hru.elevband = NULL,
 #'              clim.prcp = stcroix$prcp.grid, clim.tavg = stcroix$tavg.grid,
 #'              snow.flag = 0, progress.bar = TRUE)
@@ -20,9 +16,7 @@
 #' @rdname distHydroSim
 #' @export
 #'
-distHydroSim <- function(str.date = NULL, end.date = NULL, warmup=3,
-                         str.date.climate =NULL, end.date.climate  = NULL,
-                         str.date.lai =NULL, end.date.lai  = NULL,
+distHydroSim <- function(sim.dates,
                          par.sacsma = NULL,par.petHamon=NULL, par.snow17=NULL,par.routLah=NULL,
                          hru.info = NULL, hru.elevband = NULL,
                          clim.prcp = NULL, clim.tavg = NULL,
@@ -30,7 +24,7 @@ distHydroSim <- function(str.date = NULL, end.date = NULL, warmup=3,
                          snow.flag = 0, progress.bar = TRUE,month=F) {
 
   # date vectors
-  sim_date <- seq.Date(str.date-years(warmup), end.date, by = "month")
+  sim_date <- seq.Date(sim.dates[["Start"]]-years(warmup), sim.dates[["End"]], by = "month")
   #jdate <- as.numeric(format(sim_date, "%j"))
   jdate <-  c(15,46,76,107,137,168,198,229,259,290,321,351)
   ydate <- as.POSIXlt(sim_date)$year + 1900
@@ -41,7 +35,7 @@ distHydroSim <- function(str.date = NULL, end.date = NULL, warmup=3,
   sim_num  <- length(sim_date)  # number of simulation steps (months)
   hru_num  <- nrow(hru.info)  # number of HRUs
   # Extract the sim period from the climate data for each HRU
-  climate_date <- seq.Date(str.date.climate, end.date.climate, by = "month")
+  climate_date <- seq.Date(sim.dates[["Start_climate"]], sim.dates[["End_climate"]], by = "month")
   grid_ind <-which(climate_date %in% sim_date)
   hru_prcp <- clim.prcp[grid_ind,]
   hru_tavg <- clim.tavg[grid_ind,]
@@ -100,25 +94,25 @@ distHydroSim <- function(str.date = NULL, end.date = NULL, warmup=3,
 
       }else{
         # if lai data is not enough
-        if(is.null(str.date.lai)) str.date.lai<-str.date
-        if(is.null(end.date.lai)) end.date.lai<-end.date
+        if(is.null(sim.dates[["Start_lai"]])) str.date.lai<-sim.dates[["Start_climate"]]
+        if(is.null(sim.dates[["End_lai"]])) end.date.lai<-sim.dates[["End_climate"]]
 
         ## set the first year lai to before
-        if(str.date.lai>str.date-years(warmup)){
-          lack_lai_years<-floor(as.numeric(difftime(str.date.lai,str.date-years(warmup),units="days")/365))
+        if(sim.dates[["Start_lai"]]>sim.dates[["Start"]]-years(warmup)){
+          lack_lai_years<-floor(as.numeric(difftime(sim.dates[["Start_lai"]],sim.dates[["Start"]]-years(warmup),units="days")/365))
           hru.lc.lai<-lapply(hru.lc.lai,function(x) rbind(apply(x[1:12,],2,rep,lack_lai_years),x))
-          str.date.lai<-str.date-years(warmup)
+          sim.dates[["Start_lai"]]<-sim.dates[["Start"]]-years(warmup)
         }
         ## set the last year lai to after
-        if(end.date.lai<end.date){
-          lack_lai_years<-floor(as.numeric(difftime(end.date,end.date.lai,units="days")/365))
+        if(sim.dates[["End_lai"]]<sim.dates[["End"]]){
+          lack_lai_years<-floor(as.numeric(difftime(sim.dates[["End"]],sim.dates[["End_lai"]],units="days")/365))
           start1<-length(hru.lc.lai[[1]][,1])-11
           hru.lc.lai<-lapply(hru.lc.lai,function(x) rbind(x,apply(x[start1:(start1+11),],2,rep,lack_lai_years)))
-          end.date.lai<-end.date
+          sim.dates[["End_lai"]]<-sim.dates[["End"]]
         }
 
         # filter lai data by the simulation date
-        lai_date <- seq.Date(str.date.lai, end.date.lai, by = "month")
+        lai_date <- seq.Date(sim.dates[["Start_lai"]], sim.dates[["End_lai"]], by = "month")
         grid_ind_lai <-which(lai_date %in% sim_date)
         hru.lc.lai<-lapply(hru.lc.lai,function(x) x[grid_ind_lai,] )
 
@@ -204,7 +198,7 @@ distHydroSim <- function(str.date = NULL, end.date = NULL, warmup=3,
 #' @export
 #'
 dWaSSIC<- function(sim.dates, warmup=3,mcores=1,
-                   par.sacsma = NULL,par.petHamon=NULL,
+                   par.sacsma = NULL,par.petHamon=NULL,par.routing=NULL,
                    hru.info = NULL,
                    clim.prcp = NULL, clim.tavg = NULL,
                    hru.lai=NULL,hru.lc.lai=NULL,huc.lc.ratio=NULL)
@@ -231,9 +225,10 @@ dWaSSIC<- function(sim.dates, warmup=3,mcores=1,
   hru_num   <- nrow(hru.info)  # total number of hrus in the watershed
   hru_lat     <- hru.info$HRU_Lat # Latitude of each HRU (Deg)
   hru_lon     <- hru.info$HRU_Lon # Longitude of each HRU (Deg)
-  # hru_area    <- hru.info$HRU_Area # Area of each HRU (as %)
-  # hru_elev    <- hru.info$`HRU_Elev(m)` # Elevation of each HRU (m)
-
+  hru_area<-NULL;hru_elev<-NULL;hru_flowlen<-NULL
+  if("HRU_Area" %in% names(hru.info)) hru_area <- hru.info$HRU_Area # Area of each HRU (as %)
+  if("HRU_Elev(m)" %in% names(hru.info)) hru_elev    <- hru.info$`HRU_Elev(m)` # Elevation of each HRU (m)
+  if("HRU_FlowLen(m)" %in% names(hru.info)) hru_flowlen    <- hru.info$`HRU_FlowLen(m)` # Elevation of each HRU (m)
   # WaSSI for each HRU and calculate adjust temp and pet values
 
   WaSSI<-function(h){
@@ -283,6 +278,14 @@ dWaSSIC<- function(sim.dates, warmup=3,mcores=1,
     return(out)
   }
 
+  huc_routing<-function(h){
+    out2<-lohamann(par = par.routing[h,], inflow.direct = out[[h]][["surf"]],
+                   inflow.base = out[[h]][["base"]], flowlen = hru_flowlen[h])
+    FLOW_SURF <- out2$surf * hru_area[h] / sum(hru_area)
+    FLOW_BASE <- out2$base * hru_area[h] / sum(hru_area)
+    return(list(surf=FLOW_SURF,base=FLOW_BASE))
+  }
+
   # get the real simulate period result
   if(mcores>1){
     result<-mclapply(c(1:hru_num), WaSSI,mc.cores = mcores)
@@ -290,8 +293,22 @@ dWaSSIC<- function(sim.dates, warmup=3,mcores=1,
     result<-lapply(c(1:hru_num), WaSSI)
   }
 
-  result<- lapply(result, function(x) as.data.frame(x)[(warmup*12+1):length(x[[1]]),])
-  return(result)
+  out<- lapply(result, function(x) as.data.frame(x)[(warmup*12+1):length(x[[1]]),])
+
+  # routing based on catchment area
+  if(is.null(par.routing & is.null(hru_flowlen) & is.null(hru_area))){
+
+    return(out)
+
+  }else{
+    # Channel flow routing from Lohmann routing model
+    out2 <- mclapply(c(1:hru_num), huc_routing,mc.cores = mcores)
+    out3<-lapply(names(out2[[1]]), function(var) apply(sapply(out2, function(x) x[[var]]),1,sum))
+
+  }
+
+  return(list(FLOW_SURF = out3[[1]], FLOW_BASE=out3[[2]],HUC=out))
+
 }
 
 # Hamon Potential Evapotranspiration Equation----
