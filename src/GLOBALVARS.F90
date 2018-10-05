@@ -118,30 +118,9 @@
 
       
 ! Soil mositure for each land cover
-      REAL  UZTWC_lc, UZFWC_lc, LZTWC_lc, LZFSC_lc, LZFPC_lc,&
-            ETUZTW_lc, ETLZTW_lc, RESIDET_lc, ETUZFW_lc, &
-            RATLZT_lc,RATLZ_lc, &
-            ET_lc, GEP_lc,RECO_lc, NEE_lc, &
-            UZRAT_lc,TWX_lc,PERCM_lc, &
-            PERC_lc, DEFR_lc, LZDEF_lc,  PERCT_lc,  &
-            HPL_lc, RATLP_lc, RATLS_lc, FRACP_lc, &
-            PERCP_lc,PERCS_lc,PERCF_lc,&
-            BF_lc, SBF_lc, SURFRO_lc, SIF_lc,DEL_lc,SSUR_lc,SPERC_lc, &
-            PBF_lc,INF_lc,INFIL_lc
+      REAL  UZTWC_lc, UZFWC_lc, LZTWC_lc, LZFSC_lc, LZFPC_lc
       COMMON/SOILLAND/UZTWC_lc(MAX_HUCS), UZFWC_lc(MAX_HUCS), LZTWC_lc(MAX_HUCS), &
-            LZFSC_lc(MAX_HUCS), LZFPC_lc(MAX_HUCS),&
-            ETUZTW_lc(MAX_YEARS,12,MAX_HUCS), ETLZTW_lc(MAX_YEARS,12,MAX_HUCS), &
-            RESIDET_lc(MAX_YEARS,12,MAX_HUCS), ETUZFW_lc(MAX_YEARS,12,MAX_HUCS), &
-            RATLZT_lc(MAX_HUCS),RATLZ_lc(MAX_HUCS), &
-            ET_lc(MAX_YEARS,12,MAX_HUCS), GEP_lc(MAX_YEARS,12,MAX_HUCS),&
-            RECO_lc(MAX_YEARS,12,MAX_HUCS), NEE_lc(MAX_YEARS,12,MAX_HUCS), &
-            UZRAT_lc(MAX_HUCS),TWX_lc(MAX_HUCS),PERCM_lc(MAX_HUCS), &
-            PERC_lc(MAX_HUCS), DEFR_lc(MAX_HUCS), LZDEF_lc(MAX_HUCS),  PERCT_lc(MAX_HUCS),  &
-            HPL_lc(MAX_HUCS), RATLP_lc(MAX_HUCS), RATLS_lc(MAX_HUCS), FRACP_lc(MAX_HUCS), &
-            PERCP_lc(MAX_HUCS),PERCS_lc(MAX_HUCS),PERCF_lc(MAX_HUCS),&
-            BF_lc(MAX_HUCS), SBF_lc(MAX_HUCS), SURFRO_lc(MAX_HUCS), &
-            SIF_lc(MAX_HUCS),DEL_lc(MAX_HUCS),SSUR_lc(MAX_HUCS),SPERC_lc(MAX_HUCS),&
-            PBF_lc(MAX_HUCS), INF_lc(MAX_HUCS),INFIL_lc(MAX_HUCS)      
+            LZFSC_lc(MAX_HUCS), LZFPC_lc(MAX_HUCS)
 
 ! Soil mositure for GRID
       REAL  UZTWC,UZFWC,LZTWC,LZFPC,LZFSC

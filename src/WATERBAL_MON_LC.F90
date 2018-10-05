@@ -28,6 +28,18 @@
       REAL DINC,DLZP,DLZS,DUZ,MELTMAX,PINC,SMF,RAINTEMP,SNOWTEMP,RAINPPT,SNOWPPT        
            
       INTEGER NINC,F
+
+      REAL ETUZTW_lc(MAX_YEARS,12,MAX_HUCS), ETLZTW_lc(MAX_YEARS,12,MAX_HUCS), &
+            RESIDET_lc(MAX_YEARS,12,MAX_HUCS), ETUZFW_lc(MAX_YEARS,12,MAX_HUCS), &
+            RATLZT_lc(MAX_HUCS),RATLZ_lc(MAX_HUCS), &
+            ET_lc(MAX_YEARS,12,MAX_HUCS), GEP_lc(MAX_YEARS,12,MAX_HUCS),&
+            RECO_lc(MAX_YEARS,12,MAX_HUCS), NEE_lc(MAX_YEARS,12,MAX_HUCS), &
+            UZRAT_lc(MAX_HUCS),TWX_lc(MAX_HUCS),PERCM_lc(MAX_HUCS), &
+            PERC_lc(MAX_HUCS), DEFR_lc(MAX_HUCS), LZDEF_lc(MAX_HUCS),  PERCT_lc(MAX_HUCS),  &
+            HPL_lc(MAX_HUCS), RATLP_lc(MAX_HUCS), RATLS_lc(MAX_HUCS), FRACP_lc(MAX_HUCS), &
+            PERCP_lc(MAX_HUCS),PERCS_lc(MAX_HUCS),PERCF_lc(MAX_HUCS),&
+            BF_lc(MAX_HUCS), SBF_lc(MAX_HUCS), &
+            SIF_lc(MAX_HUCS),DEL_lc(MAX_HUCS),SSUR_lc(MAX_HUCS),SPERC_lc(MAX_HUCS)
       
     ! REAL :: RUNLAND(NGRID,NYEAR_S+NWARMUP,12,31,NLC)
     ! REAL :: ETLAND(NGRID,NYEAR_S+NWARMUP,12,31,NLC)
@@ -41,7 +53,6 @@
                   
         IF (J_S .EQ. 1 .AND. M .EQ. 1) THEN
  
-        LZFSC_lc=0.0
         DO 50 K=1, NLC
                         
            UZTWC_lc(K) = UZTWM(I)
@@ -49,7 +60,6 @@
            LZTWC_lc(K) = LZTWM(I)
            LZFSC_lc(K) = 0.75*LZFSM(I)
            LZFPC_lc(K) = 0.75*LZFPM(I)
-           SURFRO_lc(K)=0
 50      CONTINUE
         
         ENDIF 
