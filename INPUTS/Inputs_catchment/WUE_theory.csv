@@ -1,0 +1,17 @@
+LC_ID,WUE,RECO_Interc,RECO_Slope,IGBP,LC_Name
+1,3.13,40.6,0.43,CRO,Croplands
+2,1.37,11.4,0.69,CSH,Closed Shrublands
+3,3.2,30.8,0.45,DBF,Deciduous Broadleaf Forest
+4,2.59,19.6,0.61,EBF,Evergreen Broadleaf
+5,2.46,9.9,0.68,ENF,Evergreen Needleleaf
+6,2.12,18.9,0.64,GRA,Grasslands
+7,2.74,24.4,0.62,MF,Mixed Forests
+8,1.33,9.7,0.56,OSH,Open Shrublands
+9,1.26,25.2,0.53,SAV,Savannas
+10,1.66,7.8,0.56,WET,Wetlands
+11,0,0,0,-,Barren
+12,0,0,0,-,Water
+13,0,0,0,-,Water
+14,0,0,0,-,Water
+15,0,0,0,-,Water
+16,0,0,0,-,Water

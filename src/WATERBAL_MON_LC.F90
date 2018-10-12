@@ -338,12 +338,14 @@
 
 ! --- COMPUTE FREE WATER DEPLETION COEFICIENTS FOR THE TIME INCREMENT BEING USED
 
-      DUZ=UZK(I)*DINC
+!      DUZ=UZK(I)*DINC
       
-      DLZP=LZPK(I)*DINC
+!      DLZP=LZPK(I)*DINC
       
-      DLZS=LZSK(I)*DINC
-                  
+!      DLZS=LZSK(I)*DINC
+    DUZ  = 1 - (1 - UZK(I))**DINC
+    DLZP = 1 - (1 - LZPK(I))**DINC
+    DLZS = 1 - (1 - LZSK(I))**DINC 
 
 ! --- SET UP INCREMENTAL DO LOOP FOR THE TIME INTERVAL
 !if (I==1.and.J==45) print*,"I=",I,'J=',J,'M=',M,'K=',K,"middle LZFSC_lc=",LZFSC_lc(K)

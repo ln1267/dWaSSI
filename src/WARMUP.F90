@@ -177,7 +177,7 @@ SUBROUTINE RPSWUE
 
     INTEGER I,K
 
-    CHARACTER*1000 DUMY(30),LCname
+    CHARACTER*1000 DUMY(30),LCname,IGBP
 
 ! --- Read and print land use data for each active cell IN THE BASIC.OUT FILE
     WRITE(77,20001)
@@ -185,22 +185,25 @@ SUBROUTINE RPSWUE
 20001  FORMAT(/'WUE paramters INFO FOR EACH SIMULATION CELL'/)
 
     READ (9,5001) DUMY
+    READ (10,5001) DUMY
 5001   FORMAT (1000A30)
     
     print*,"Landcover ID,WUE,RECO_inter,RECO_slope,Land cover name"
     
     DO 1011 K=1, NLC
 
-        READ(9,*) I, wue_k(K), reco_inter(K) , reco_slope(K),LCname
-
-        WRITE(77,11001) I, wue_k(K), reco_inter(K) , reco_slope(K),LCname
+        READ(9,*) I, wue_k(K), reco_inter(K) , reco_slope(K),IGBP,LCname
+        READ(10,*) I, ET_Interc(K),P_coef(K),PET_coef(K),LAI_coef(K),&
+                   P_PET_coef(K),P_LAI_coef(K),PET_LAI_coef(K),IGBP,LCname
+        WRITE(77,11001) I, wue_k(K), reco_inter(K) , reco_slope(K),IGBP,LCname
         
         !print*,I, wue_k(K), reco_inter(K) , reco_slope(K)
     
-        WRITE(*,11001) I, wue_k(K), reco_inter(K) , reco_slope(K),LCname
-
-11001  FORMAT(I5, 3F8.2,',',1000A30)
-
+        WRITE(*,11001) I, wue_k(K), reco_inter(K) , reco_slope(K),IGBP,LCname
+        WRITE(*,11002) I, ET_Interc(K),P_coef(K),PET_coef(K),LAI_coef(K),&
+                   P_PET_coef(K),P_LAI_coef(K),PET_LAI_coef(K),IGBP,LCname
+11001  FORMAT(I5, 3F8.2,',',A30,',',A30)
+11002  FORMAT(I5, 7F8.2,',',A30,',',A30)
 1011    CONTINUE
 
     RETURN

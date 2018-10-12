@@ -51,8 +51,10 @@
     ! Latest model By Yuan Fang Sep 10,2015
     !          R2=0.68, p<0.0001,RMSE=18.1 mm
 
-            AET_lc(J,M,K) = -4.79 + 0.75*PET(I,J,M) + 3.92*LAI_lc(I,J,M,K)
-
+            !AET_lc(J,M,K) = -4.79 + 0.75*PET(I,J,M) + 3.92*LAI_lc(I,J,M,K)
+            AET_lc(J,M,K) = ET_Interc(K)+P_coef(K)*RAIN(I,J,M)+PET_coef(K)*PET(I,J,M)+&
+           LAI_coef(K)*LAI_lc(I,J,M,K)+P_PET_coef(K)*RAIN(I,J,M)*PET(I,J,M)+&
+           P_LAI_coef(K)*RAIN(I,J,M)*LAI_lc(I,J,M,K)+PET_LAI_coef(K)*PET(I,J,M)*LAI_lc(I,J,M,K)
     !C ----CALCULATE TOTAL PET AND PAET FOR THE HUC FOR A GIVEN YEAR AND MONTH
                  
             TPAET = TPAET + AET_lc(J,M,K) * LADUSE_lc(I,K)

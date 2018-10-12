@@ -58,8 +58,9 @@ Print*, "Please set the first parameter as '1' and '/' in you directory if you a
         OPEN(4,FILE=TRIM(INPATH)//'/CLIMATE.TXT')
         OPEN(7,FILE=TRIM(INPATH)//'/SOILINFO.TXT')
         OPEN(8,FILE=TRIM(INPATH)//'/LANDLAI.TXT')
-        OPEN(9,FILE=TRIM(INPATH)//'/WUE_input.TXT')
-        
+        !OPEN(9,FILE=TRIM(INPATH)//'/WUE_input.TXT')
+        OPEN(9,FILE=TRIM(INPATH)//'/WUE_theory.csv')
+        OPEN(10,FILE=TRIM(INPATH)//'/ET_theory.csv')
         ! ---Open Output files---------------------------------------- 
         OPEN(77,FILE=TRIM(OUTPATH)//'/BASICOUT.TXT')
         OPEN(78,FILE=TRIM(OUTPATH)//'/MONTHFLOW.TXT')

@@ -115,6 +115,11 @@ hru_info["HRU_FlowLen(m)"]<-1000
 library(sacsmaR)
 par_routing<-stcroix$hru.par[1:22,28:31]
 
+# Load coefficients for SUN's ET and carbon calculation
+ET_coefs<-read.csv("INPUTS/Inputs_catchment/ET_theory.csv",nrows = length(huc_lc_ratio[1,]))
+names(ET_coefs)<-c("LC_ID","Intercept","P_coef","PET_coef","LAI_coef","P_PET_coef","P_LAI_coef","PET_LAI_coef","IGBP","LC_Name")
+WUE_coefs<-read.csv("INPUTS/Inputs_catchment/WUE_theory.csv",nrows = length(huc_lc_ratio[1,]))
+names(WUE_coefs)<-c("LC_ID","WUE","RECO_Interc", "RECO_Slope","IGBP","LC_Name")
 ```
 
 ## Run the simulation using dWaSSIC funtion
@@ -123,13 +128,19 @@ flowR <- dWaSSIC(sim.dates=Sim_dates, warmup = 3,mcores = 3,
              par.sacsma = par_sacsma,par.petHamon=par_petHamon,par.routing =par_routing, 
              hru.info = hru_info, 
              clim.prcp = clim_prcp, clim.tavg = clim_tavg,
-             hru.lai=NULL,hru.lc.lai=hru_lc_lai,huc.lc.ratio=huc_lc_ratio) 
+             hru.lai=NULL,hru.lc.lai=hru_lc_lai,huc.lc.ratio=huc_lc_ratio,WUE.coefs = WUE_coefs,ET.coefs = ET_coefs) 
+
+
+out_weight<-lapply(c(1:length(flowR$HUC)),function (x) flowR$HUC[[x]]*HUC$Area_m2[x]/sum(HUC$Area_m2))
+flowR_Catchment<-as.data.frame(sapply(names(out_weight[[1]]), function(var) apply(sapply(out_weight, function(x) x[[var]]),1,sum)))
 
 Rain_mean<-apply(clim_prcp, 1, mean,na.rm=T)
-df <- data.frame(date = Sim_dates$Seq_date,Srufflow = flowR$FLOW_SURF,Baseflow=flowR$FLOW_BASE)
+df <- data.frame(date = Sim_dates$Seq_date,Srufflow = flowR$FLOW_SURF,Baseflow=flowR$FLOW_BASE,AET=flowR_Catchment$totaet,Rain=Rain_mean[Sim_dates$Sim_ind],nt=flowR_Catchment$tot)
 ggplot(df, aes(date, Srufflow)) + geom_line() + labs(x = "", y = "Surface flow (mm/month)")
 ggplot(df, aes(date, Baseflow)) + geom_line() + labs(x = "", y = "Base flow  (mm/month)")
-
+ggplot(df, aes(date, Baseflow+Srufflow)) + geom_line() + labs(x = "", y = "Total flow  (mm/month)")
+ggplot(df, aes(date, nt)) + geom_line() + labs(x = "", y = "Actual ET  (mm/month)")
+ggplot(df, aes(date, Rain)) + geom_line() + labs(x = "", y = "Rainfall  (mm/month)")
 ```
 
 # Input data process

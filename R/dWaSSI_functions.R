@@ -201,7 +201,7 @@ dWaSSIC<- function(sim.dates, warmup=3,mcores=1,
                    par.sacsma = NULL,par.petHamon=NULL,par.routing=NULL,
                    hru.info = NULL,
                    clim.prcp = NULL, clim.tavg = NULL,
-                   hru.lai=NULL,hru.lc.lai=NULL,huc.lc.ratio=NULL)
+                   hru.lai=NULL,hru.lc.lai=NULL,huc.lc.ratio=NULL,WUE.coefs=NULL,ET.coefs=NULL)
 {
 
   # date vectors
@@ -229,6 +229,9 @@ dWaSSIC<- function(sim.dates, warmup=3,mcores=1,
   if("HRU_Area" %in% names(hru.info)) hru_area <- hru.info$HRU_Area # Area of each HRU (as %)
   if("HRU_Elev(m)" %in% names(hru.info)) hru_elev    <- hru.info$`HRU_Elev(m)` # Elevation of each HRU (m)
   if("HRU_FlowLen(m)" %in% names(hru.info)) hru_flowlen    <- hru.info$`HRU_FlowLen(m)` # Elevation of each HRU (m)
+
+  #get the number of land cover types
+  if (!is.null(huc.lc.ratio)) NLCs<-length(huc.lc.ratio[1,])
   # WaSSI for each HRU and calculate adjust temp and pet values
 
   WaSSI<-function(h){
@@ -267,9 +270,34 @@ dWaSSIC<- function(sim.dates, warmup=3,mcores=1,
     hru.lc.lai<-lapply(hru.lc.lai,function(x) x[grid_ind_lai,] )
 
     # Calculate PET based on LAI
-    hru_lc_pet<-hru_pet*hru.lc.lai[[h]]*0.0222+0.174*hru_mrain+0.502*hru_pet+5.31*hru.lc.lai[[h]]
+    if(is.null(ET.coefs)){
+      hru_lc_pet<-hru_pet*hru.lc.lai[[h]]*0.0222+0.174*hru_mrain+0.502*hru_pet+5.31*hru.lc.lai[[h]]
+    }else{
+      # Calculate the actual ET based on SUN's ET model
+      hru_lc_pet<-matrix(NA,nrow =length(hru_pet), ncol=NLCs)
+      for (i in c(1:NLCs)){
+        hru_lc_pet[,i]<- ET.coefs[i,"Intercept"] +
+          ET.coefs[i,"P_coef"]*hru_mrain+
+          ET.coefs[i,"PET_coef"]*hru_pet+
+          ET.coefs[i,"LAI_coef"]*hru.lc.lai[[h]][i]+
+          ET.coefs[i,"P_PET_coef"]*hru_mrain*hru_pet +
+          ET.coefs[i,"P_LAI_coef"]*hru_mrain*hru.lc.lai[[h]][i] +
+          ET.coefs[i,"PET_LAI_coef"] *hru_pet*hru.lc.lai[[h]][i]
+      }
+    }
+
+    # calculate flow based on PET and SAC-SMA model
     hru_lc_out <-apply(hru_lc_pet,2,sacSma_mon,par = par_sacsma[h,], prcp = hru_mrain )
 
+    if(!is.null(WUE.coefs)){
+      # Calculate Carbon based on WUE for each vegetation type
+      for (i in c(1:NLCs)){
+        hru_lc_out[[i]][["GEP"]]<-hru_lc_out[[i]][["totaet"]] *WUE.coefs$WUE[i]
+        hru_lc_out[[i]][["RECO"]]<-WUE.coefs$RECO_Interc[i] + hru_lc_out[[i]][["GEP"]] *WUE.coefs$RECO_Slope[i]
+        hru_lc_out[[i]][["NEE"]] <-hru_lc_out[[i]][["RECO"]]-hru_lc_out[[i]][["GEP"]]
+      }
+
+    }
     # Weight each land cover type based on it's ratio
     hru_out<-lapply(c(1:length(huc.lc.ratio[h,])),function(x) lapply(hru_lc_out[[x]],function(y) huc.lc.ratio[h,x]*y))
     out<-lapply(names(hru_lc_out[[1]]), function(var) apply(sapply(hru_out, function(x) x[[var]]),1,sum))

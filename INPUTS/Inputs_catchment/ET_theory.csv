@@ -1,0 +1,18 @@
+LC_ID,Intercept,P_coef,PET_coef,LAI_coef,P_PET_coef,P_LAI_coef,PET_LAI_coef,IGBP,LC_Name
+1,-4.79,0,0.75,3.29,0,0,0,CRO,Croplands
+2,-4.79,0,0.75,3.29,0,0,0,CSH,Closed Shrublands
+3,-4.79,0,0.75,3.29,0,0,0,DBF,Deciduous Broadleaf Forest
+4,-4.79,0,0.75,3.29,0,0,0,EBF,Evergreen Broadleaf
+5,-4.79,0,0.75,3.29,0,0,0,ENF,Evergreen Needleleaf
+6,-4.79,0,0.75,3.29,0,0,0,GRA,Grasslands
+7,-4.79,0,0.75,3.29,0,0,0,MF,Mixed Forests
+8,-4.79,0,0.75,3.29,0,0,0,OSH,Open Shrublands
+9,-4.79,0,0.75,3.29,0,0,0,SAV,Savannas
+10,-4.79,0,0.75,3.29,0,0,0,WET,Wetlands
+11,0,0,0,0,0,0,0,-,Barren
+12,0,0,1,0,0,0,0,-,Water
+
+
+###-----------------------------------------------------------
+The default equation for ET is:
+ET = P_ceof*P+PET_coef*PET+LAI_coef*LAI+P_PET_coef*P*PET+P_LAI_coef*P*LAI+PET_LAI_coef*PET*LAI

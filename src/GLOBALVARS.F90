@@ -10,6 +10,11 @@
   REAL wue_k,reco_inter,reco_slope
   COMMON/WUE/wue_k(MAX_HUCS),reco_inter(MAX_HUCS),reco_slope(MAX_HUCS)
 
+  ! ET
+  REAL ET_Interc,P_coef,PET_coef,LAI_coef,P_PET_coef,P_LAI_coef,PET_LAI_coef
+  COMMON/ET/ET_Interc(MAX_HUCS),P_coef(MAX_HUCS),PET_coef(MAX_HUCS),&
+           LAI_coef(MAX_HUCS),P_PET_coef(MAX_HUCS),P_LAI_coef(MAX_HUCS),PET_LAI_coef(MAX_HUCS)
+  
 ! BASIC
       INTEGER NGRID,NYEAR,NYEAR_S,NWARMUP,NLC,BYEAR,YSTART,YEND,IYSTART,IYEND,LAI_S_Y,LAI_E_Y,modelscale
       COMMON/BASIC/NGRID,NYEAR,NYEAR_S,NWARMUP,NLC,BYEAR,YSTART,YEND,IYSTART,IYEND,LAI_S_Y,LAI_E_Y,modelscale
