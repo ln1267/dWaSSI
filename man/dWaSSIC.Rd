@@ -7,7 +7,8 @@
 dWaSSIC(sim.dates, warmup = 3, mcores = 1, par.sacsma = NULL,
   par.petHamon = NULL, par.routing = NULL, hru.info = NULL,
   clim.prcp = NULL, clim.tavg = NULL, hru.lai = NULL,
-  hru.lc.lai = NULL, huc.lc.ratio = NULL)
+  hru.lc.lai = NULL, huc.lc.ratio = NULL, WUE.coefs = NULL,
+  ET.coefs = NULL)
 }
 \arguments{
 \item{sim.dates}{list of all dates}
@@ -15,6 +16,10 @@ dWaSSIC(sim.dates, warmup = 3, mcores = 1, par.sacsma = NULL,
 \item{warmup}{years for warming up WaSSI-C model}
 
 \item{mcores}{how many cores using for simulation}
+
+\item{WUE.coefs}{the input parameters of WUE}
+
+\item{ET.coefs}{the input parameter of ET}
 }
 \value{
 outputs potential evapotranspiration (mm day-1)

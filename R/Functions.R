@@ -156,7 +156,7 @@ hru_zonal<-function(classname,daname,shp,fun='mean',field=NULL,plot=T){
 #' @export
 # this function is used for zonal vegetation ratio of each HRU in by a shp file
 
-hru_lc_ratio<-function(classname,shp,field=NULL){
+hru_lc_ratio<-function(classname,shp,field=NULL,mcores=10){
   library(raster)
   class<-raster(classname)
   class<-crop(class,shp)
@@ -177,7 +177,7 @@ hru_lc_ratio<-function(classname,shp,field=NULL){
 
   # Run sta
   if(length(shp)>1){
-    lc_ratio<- lapply(c(1:length(shp)), f_zonal)
+    lc_ratio<- mclapply(c(1:length(shp)), f_zonal,mc.cores=mcores)
     lc_ratio<-do.call(rbind,lc_ratio)
   }else{
     class_ratio<-as.data.frame(table(matrix(class))/sum(table(matrix(class))))
@@ -1042,7 +1042,7 @@ f_paste<-function(x,y,sep=""){
 #' @examples
 #' zonal_shp<-f_zonal_shp_nc(ncfilename="/Dataset/backup/CABLE/ET_ann_82_14.nc",
 #' basin,,zonal_field="Station")
-f_zonal_shp_nc<-function(ncfilename,shp,zonal_field,category=T){
+f_zonal_shp_nc<-function(ncfilename,shp,zonal_field,category=T,mcores=10){
   require(raster)
   require(dplyr)
   # Function for get the ratio of one polygon
@@ -1065,9 +1065,11 @@ f_zonal_shp_nc<-function(ncfilename,shp,zonal_field,category=T){
   levs<-levs[!is.na(levs)]
 
   # Sta the ratio of each category for all polygons
-  .aa<-lapply(extract_shps,f_ratio,levs=levs)
+  .aa<-mclapply(extract_shps,f_ratio,levs=levs,mc.cores=mcores)
   .ab<-do.call(rbind,.aa)
   .ab[zonal_field]<-rep(as.character(shp[[zonal_field]]),each=length(levs))
+  .ab$Ratio[is.na(.ab$Ratio)]<-0
+  .ab$Freq[is.na(.ab$Freq)]<-0
   .ab
 }
 

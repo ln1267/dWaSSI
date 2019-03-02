@@ -185,6 +185,8 @@ distHydroSim <- function(sim.dates,
 #' @param sim.dates  list of all dates
 #' @param warmup years for warming up WaSSI-C model
 #' @param mcores how many cores using for simulation
+#' @param WUE.coefs the input parameters of WUE
+#' @param ET.coefs the input parameter of ET
 #' @return outputs potential evapotranspiration (mm day-1)
 #' @details For details see Haith and Shoemaker (1987)
 #' @examples
