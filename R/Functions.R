@@ -813,7 +813,7 @@ multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
 #' @keywords aggregation
 #' @export
 #' @examples
-#' daily2annual( FUN=mean)
+#' daily2annual(x, FUN=mean)
 #'
 daily2annual<-function (x, FUN, na.rm = TRUE, out.fmt = "%Y-%m-%d")
 {
@@ -864,7 +864,7 @@ daily2annual<-function (x, FUN, na.rm = TRUE, out.fmt = "%Y-%m-%d")
 #' @keywords aggregation
 #' @export
 #' @examples
-#' daily2monthly( FUN=mean)
+#' daily2monthly(x, FUN=mean)
 #'
 daily2monthly<-function (x, FUN, na.rm = TRUE, ...)
 {
