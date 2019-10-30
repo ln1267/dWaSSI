@@ -6,3 +6,7 @@
 *.o
 *.mod
 src/dWaSSIC
+INPUTS/Inputs_grid/*
+data/vars/*
+data/landcover/ESA_LC/*
+OUTPUTS*/*
