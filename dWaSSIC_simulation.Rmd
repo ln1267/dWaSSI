@@ -174,6 +174,11 @@ Basin_coords<-gCentroid(Basins, byid=TRUE)
 rownames(Basin_coords@coords)<-Basins$BasinID
 Basin_coords<-as.data.frame(Basin_coords)
 
+# Add latitude and longitude infor to the Basin
+if(!"lat"  %in% names(Basins)) {
+  Basins[["Lat"]]=Basin_coords$y
+  Basins[["Long"]]=Basin_coords$x
+}
 # plot the basin
 leaflet(Basins) %>%addTiles() %>%
   addPolygons(color = "black", weight = 1, smoothFactor = 0.5)
@@ -182,12 +187,11 @@ leaflet(Basins) %>%addTiles() %>%
 
 ## CELLINFO.TXT
 ```{r cellinfo}
-LUCC_catchment<-f_zonal_shp_nc(ncfilename ="data/Landcover/LUCC_Sun_IGBP.nc",shp = Basins,category = T,zonal_field = "BasinID")
-LUCC_catchment$BasinID<-as.integer(LUCC_catchment$BasinID)
-hru_lcs<-dcast(LUCC_catchment[c("BasinID","Levels","Ratio")],BasinID~Levels)
+LUCC_catchment<-hru_lc_ratio(classname ="data/Landcover/LUCC_Sun_IGBP.nc",shp = Basins,field = "BasinID")
+hru_lcs<-dcast(LUCC_catchment[c("BasinID","Class","Ratio")],BasinID~Class)
 hru_lcs[is.na(hru_lcs)]<-0.0
 
-cellinfo<-Basins@data[c("BasinID","Shape_Area","Lat","Long_","Elev","Len1")]
+cellinfo<-Basins@data[c("BasinID","Shape_Area","Lat","Long","Elev","Len1")]
 cellinfo<-arrange(cellinfo,BasinID)
 cellinfo[c("Shape_Area","Elev","Len1")]<-round(cellinfo[c("Shape_Area","Elev","Len1")],0)
 cellinfo[c( "Lat","Long_")]<-round(cellinfo[c( "Lat","Long_")],3)
@@ -200,11 +204,9 @@ write.table(cellinfo,"INPUTS/test/CELLINFO.TXT",sep = ',',row.names = FALSE)
 ## CLIMATE.TXT
 ### Zonal from local data
 ```{r climate_local,eval=F}
-ncfilename<-"data/Climate/PRE_mon_82_15.nc"
-Pre_catchment<-f_sta_shp_nc(ncfilename,Basins,varname = "P",start = 1982,zonal_field = "BasinID")
+Pre_catchment<-f_sta_shp_nc("data/Climate/Pre_MJ_mon_00_15.tif",Basins,varname = "P",start = 1982,zonal_field = "BasinID")
 
-ncfilename<-"data/Climate/TEMP_mon_82_15.nc"
-Tmean_catchment<-f_sta_shp_nc(ncfilename,Basins,varname = "T",start = 1982,zonal_field = "BasinID")
+Tmean_catchment<-f_sta_shp_nc("data/Climate/Temp_MJ_mon_00_15.tif",Basins,varname = "T",start = 1982,zonal_field = "BasinID")
 
 climate<-Pre_catchment
 climate$Tavg<-Tmean_catchment$T
