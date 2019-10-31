@@ -40,21 +40,15 @@ f_lib_check<-function(libs){
     library(dWaSSIC)
   }else{
     install_github("ln1267/dWaSSIC")
+    install_github("tanerumit/sacsmaR")
     library(dWaSSIC)
   }
 
 # Load other required packages
-f_lib_check(c("raster","reshape2","parallel","lubridate","rgdal","rgeos","dplyr","ggplot2","leaflet"))
+f_lib_check(c("raster","reshape2","parallel","lubridate","rgdal","rgeos","dplyr","ggplot2","leaflet","sacsmaR"))
 ```
 
 # Test run
-Climate<-read.csv("~/Downloads/FOR_NING/INPUTS/R1_PRISM_CLIMATE.TXT")
-LAI<-read.csv("~/Downloads/FOR_NING/INPUTS/LANDLAI_CONUSF2F.txt")
-SOIL<-read.csv("~/Downloads/FOR_NING/INPUTS/SOILINFO_US_HUC12.TXT")
-HUC<-read.csv("~/Downloads/FOR_NING/INPUTS/CELLINFO_CONUSF2F.txt")
-LAI<-cbind(Year=2000,LAI)
-names(LAI)[2:3]<-c("BasinID","Month")
-names(HUC)[1]<-c("BasinID")
 
 ## Read input
 ```{r,eval=F}
@@ -127,7 +121,7 @@ names(hru_info)<-c("ID","BasinID","HRU_Area","HRU_Lat","HRU_Lon")#,"HRU_Elev(m)"
 hru_info["HRU_Elev(m)"]<-1000
 hru_info["HRU_FlowLen(m)"]<-1000
 
-library(sacsmaR)
+# sample routing par
 par_routing<-stcroix$hru.par[1:22,28:31]
 
 # Load coefficients for SUN's ET and carbon calculation
@@ -139,7 +133,7 @@ names(WUE_coefs)<-c("LC_ID","WUE","RECO_Interc", "RECO_Slope","IGBP","LC_Name")
 
 ## Run the simulation using dWaSSIC funtion
 ```{r}
-flowR <- dWaSSIC(sim.dates=Sim_dates, warmup = 3,mcores = 3,
+flowR <- dWaSSIC(sim.dates=Sim_dates, warmup = 3,mcores = 1,
              par.sacsma = par_sacsma,par.petHamon=par_petHamon,par.routing =par_routing, 
              hru.info = hru_info, 
              clim.prcp = clim_prcp, clim.tavg = clim_tavg,
