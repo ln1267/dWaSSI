@@ -75,7 +75,7 @@ numberOfDays <- function(date) {
 #' @details This is a function for zonal hru data
 #' @examples
 #' \dontrun{
-#'ha<-hru_zonal(classname = "inputs/Landcover/LUCC_Sun_IGBP.nc",
+#'ha<-hru_lc_zonal(classname = "inputs/Landcover/LUCC_Sun_IGBP.nc",
 #'              daname = "inputs/LAI/LAI_BNU.nc",
 #'             shp = Basins,
 #'             field="Station")
@@ -83,7 +83,7 @@ numberOfDays <- function(date) {
 #' @rdname hru_zonal
 #' @export
 # this function is used for zonal LAI of each HRU in by a shp file
-hru_zonal<-function(classname,daname,shp,fun='mean',field=NULL,plot=T){
+hru_lc_zonal<-function(classname,daname,shp,fun='mean',field=NULL,plot=T){
   require(raster)
   # read the class and data by their names
   class<-raster(classname)
@@ -1004,6 +1004,7 @@ f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,start,sca
     }
 
   }
+  sta_catchment[varname]<-round(sta_catchment[varname],3)
   sta_catchment
 }
 

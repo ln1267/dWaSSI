@@ -271,9 +271,9 @@ stopCluster(cl)
 
 ## LANDLAI.TXT
 ```{r hrulai,eval=F}
-# this function is used for zonal LAI of each HRU in by a shp file
-hru_lai<-hru_zonal(classname = "data/Landcover/LUCC_Sun_IGBP.nc",
-                      daname = "data/LAI/LAI_BNU.nc",
+# this function is used for zonal LAI of each lc in the HRU
+hru_lai<-hru_lc_zonal(classname = "data/Landcover/LUCC_Sun_IGBP.nc",
+                      daname = "data/LAI/LAI_1982_2013.tif",
                       shp = Basins,
                       field = "BasinID")
 lcs<-paste0("Class_",names(hru_lcs)[-1])
@@ -292,7 +292,7 @@ f_fillmatix<-function(a,lcs){
 ha<-lapply(hru_lai, f_fillmatix,lcs)
 hru_lais<-do.call(rbind,ha)
 hru_lais<-cbind("ID"=rep(as.integer(names(hru_lai)),each=length(hru_lai[[1]][,1])),
-                "Year"=rep(c(2001:2014),each=12),
+                "Year"=rep(c(1982:2014),each=12),
                 "Month"=c(1:12),
                 hru_lais)
 hru_lais<-as.data.frame(hru_lais)
