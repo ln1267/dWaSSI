@@ -14,6 +14,19 @@ This document demonstrates the main functionality of the dWaSSIC package.
 
 # load required document
 ```{r}
+# function for checking libs
+f_lib_check<-function(libs){
+  for (lib in libs ){
+    if(lib %in% rownames(installed.packages())){
+
+    }else{
+      install.packages(lib,repos='http://cran.us.r-project.org')
+    }
+  }
+
+  a<-lapply(libs, require, character.only = TRUE)
+}
+
 # load devtools package for installing github packages
   if("devtools" %in% installed.packages()){
     library(devtools)
@@ -26,7 +39,7 @@ This document demonstrates the main functionality of the dWaSSIC package.
   if("dWaSSI" %in% installed.packages()){
     library(dWaSSIC)
   }else{
-    install_github("ln1267/dWaSSIC",--no-multiarch)
+    install_github("ln1267/dWaSSIC")
     library(dWaSSIC)
   }
 
