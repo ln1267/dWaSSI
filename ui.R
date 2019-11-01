@@ -186,15 +186,36 @@ shinyUI(
                  HTML("<p>Please chose a '*gml' file to upload.</p>
                       "),
                  fileInput('Input_basin', 'Choose watershed shapefile', multiple=FALSE, accept="gml"),
+
+                 h2("Upload all original raster files"),
+                 HTML("<p>Please chose a '*.tif' or '*.nc' monthly stacked precipitation and temperation file to upload.</p>
+                      "),
+                 fileInput('Input_dem_raster', 'Choose elevation raster file', multiple=FALSE, accept="tif"),
+                 fileInput('Input_temp_raster', 'Choose temperature raster file', multiple=FALSE, accept="tif"),
+                 fileInput('Input_precp_raster', 'Choose precipitation raster file', multiple=FALSE, accept="tif"),
+                 fileInput('Input_lc_raster', 'Choose land cover raster file', multiple=FALSE, accept="tif"),
+                 fileInput('Input_imp_raster', 'Choose impverious raster file', multiple=FALSE, accept="tif"),
+                 fileInput('Input_lai_raster', 'Choose LAI raster file', multiple=FALSE, accept="tif"),
+
                  # Action: Plot basin ----
-                 actionButton("plotbasin","Plot the uploaded watershed!")
+                 actionButton("processrasters","process input"),
+                 # Action: Process input ----
+                 actionButton("plotrasterdata","Plot the input rasters!")
+
                ),
 
                # MainPanel for upload data----
                mainPanel(
                  ## Output: Head of the selected plotting file----
-                 h2("The Map of the Watershed"),
-                 leafletOutput("basinmap")
+                 # h2("The Map of the Watershed"),
+                 # leafletOutput("basinmap"),
+
+
+                 h2("Plot mean climate data"),
+                 HTML("<p>It will take a while for the data process. Please wait ...</p>
+                      "),
+                 verbatimTextOutput("prntraster"),
+                 leafletOutput("basinrastermap")
                )
              )
       ),

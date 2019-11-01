@@ -52,7 +52,7 @@ f_lib_check(librs)
 
 # Define server logic required to draw a histogram
 shinyServer(function(input, output,session) {
-
+  options(shiny.maxRequestSize=30*1024^2)
   # Tab: Upload data----
   # Sidepanel: upload session ----
   ## file2plot: Select a uploaded file for plotting----
@@ -117,7 +117,107 @@ shinyServer(function(input, output,session) {
   })
 })
 
-  #data_input<<-list()
+  ## Read raster data  ----
+  input_rasters<-list()
+  input_process<-list()
+  observeEvent(input$processrasters,{
+    if (is.null(input$Input_temp_raster) | is.null(BasinShp)) {
+      print("not inputs")
+      return("data is missing!")
+    }else{
+
+      print(paste0("process temp data using ",input$Input_temp_raster$datapath))
+      Tmean_catchment<-f_sta_shp_nc(input$Input_temp_raster$datapath,BasinShp,varname = "T",start = 1982,zonal_field = "BasinID")
+      Pre_catchment<-f_sta_shp_nc(input$Input_precp_raster$datapath,BasinShp,varname = "P",start = 1982,zonal_field = "BasinID")
+      climate<-Pre_catchment
+      climate$Tavg<-Tmean_catchment$T
+      climate<-arrange(climate,BasinID,Year,Month)
+      climate<-climate[c("BasinID","Year","Month","P","Tavg")]
+      climate[c("P","Tavg")]<-round(climate[c("P","Tavg")],2)
+      climate$BasinID<-as.integer(as.character(climate$BasinID))
+      names(climate)<-c("BasinID","Year","Month","Ppt_mm","Tavg_C")
+      input_process[["Climate"]]<<-climate
+      print(summary(climate))
+
+      output$prntraster<-renderPrint({
+        print("Summary of processed climate input....")
+        print(summary(climate))
+      })
+    }
+  })
+
+  ## Plot raster data  ----
+      observeEvent(input$plotrasterdata,{
+        if (is.null(input$Input_temp_raster) | is.null(BasinShp)) {
+          print("not inputs")
+          return("data is missing!")
+        }else{
+      # Plot the BasinShp
+      output$basinrastermap <- renderLeaflet({
+
+        if(is.null(BasinShp)|is.null(input$Input_temp_raster$datapath)) return()
+        Tmean_br<-brick(input$Input_temp_raster$datapath)
+        beginCluster()
+        Tmean_br <- clusterR(Tmean_br, calc, args=list(fun=mean,na.rm=T))
+        endCluster()
+        Pre_br<-brick(input$Input_precp_raster$datapath)
+        beginCluster()
+        Pre_br <- clusterR(Pre_br, calc, args=list(fun=mean,na.rm=T))
+        Pre_br<-Pre_br*12
+        endCluster()
+        pal_tmp <- colorNumeric(c("cyan", "yellow", "red"), values(Tmean_br),
+                            na.color = "transparent")
+        pal_prcp <- colorNumeric(c("azure", "cornflowerblue","darkblue"), values(Pre_br),
+                                na.color = "transparent")
+        leaflet()  %>% addTiles(group = "OSM (default)") %>%
+          #setView(lng = llong, lat=llat,zoom=13) %>%
+          addProviderTiles('Esri.WorldImagery',group = "Esri.Imagery")%>%
+          addPolygons(data=BasinShp,weight=1,col = 'red',fillOpacity = 0.2,
+                      highlight = highlightOptions(color='white',weight=1,
+                                                   bringToFront = TRUE),
+                      group = "Watershed")%>%
+          addRasterImage(Tmean_br, colors = pal_tmp, opacity = 0.8, group = "Temperature") %>%
+          addLegend("bottomleft",pal = pal_tmp, values = values(Tmean_br),
+                    title = "Mean temp (°C)")%>%
+          addRasterImage(Pre_br, colors = pal_prcp, opacity = 0.8, group = "Precipitation") %>%
+          addLegend("bottomleft",pal = pal_prcp, values = values(Pre_br),
+                    title = "Annual precipation (mm/yr)")%>%
+          addMarkers(lng = BasinShp$Longitude, lat = BasinShp$Latitude,
+                     popup = as.character(BasinShp$BasinID),label = paste0("BasinID = ",BasinShp$BasinID))%>%
+          # Layers control
+          addLayersControl(
+            baseGroups = c("OSM (default)", "Esri.Imagery"),
+            overlayGroups = c("Watershed", "Temperature","Precipitation"),
+            options = layersControlOptions(collapsed = FALSE)
+          )
+      })
+      # input_rasters[["Precp"]]<<-brick(input$Input_precp_raster$datapath)
+      # input_rasters[["Lai"]]<<-brick(input$Input_lai_raster$datapath)
+      # input_rasters[["Imp"]]<<-raster(input$Input_imp_raster$datapath)
+      # input_rasters[["Lc"]]<<-raster(input$Input_lc_raster$datapath)
+      # input_rasters[["Soil"]]<<-brick(input$Input_Soil_raster$datapath)
+
+    }
+
+  })
+
+  ## Plot Input raster files and shp ----
+  observeEvent(input$plotbasin,{
+
+    # Plot the BasinShp
+    output$basinmap <- renderLeaflet({
+      if(is.null(BasinShp)) return()
+      leaflet()  %>% addTiles() %>%
+        #setView(lng = llong, lat=llat,zoom=13) %>%
+        addPolygons(data=BasinShp,weight=1,col = 'black',fillOpacity = 0.2,
+                    highlight = highlightOptions(color='white',weight=1,
+                                                 bringToFront = TRUE))%>%
+        addMarkers(lng = BasinShp$Longitude, lat = BasinShp$Latitude,
+                   popup = as.character(BasinShp$BasinID),label = paste0("BasinID = ",BasinShp$BasinID))
+    })
+  })
+
+  data_input<-list()
   ## Action: Print the uploaded file names ----
   observeEvent(input$readdata,{
 
