@@ -53,13 +53,6 @@ shinyUI(
                sidebarPanel(
                  # Application title
 
-                 h2("Upload watershed Shapefile"),
-                 HTML("<p>Please chose a '*gml' file to upload.</p>
-                      "),
-                 fileInput('Input_basin', 'Choose watershed shapefile', multiple=FALSE, accept="gml"),
-                 # Action: Plot basin ----
-                 actionButton("plotbasin","Plot the uploaded watershed!"),
-
                  ## Plot the information----
                  h2("Select a dataset to plot"),
                  ## Input: Select a file to plot----
@@ -68,7 +61,7 @@ shinyUI(
                  # Input: Year for plotting ---
                  sliderInput("plotyrrange", "Select the year range", 1970, 2017, value = c(2000, 2010)),
                  # Input: Month ----
-                 checkboxGroupInput("plotmonths","Select the months to plot",c(1:12)),
+                 checkboxGroupInput("plotmonths","Select the months to plot",c(1:12),selected=c(6:11),inline=T),
 
                  # Action: plot input data ----
                  actionButton("plotdata","Plot the selected input data!")
@@ -76,9 +69,6 @@ shinyUI(
 
                # MainPanel for upload data----
                mainPanel(
-                 ## Output: Head of the selected plotting file----
-                 h2("The Map of the Watershed"),
-                 leafletOutput("basinmap"),
 
                  ## Output: Plot of the selected two columns----
                  h2("Please select two columns to plot the data"),
@@ -186,7 +176,28 @@ shinyUI(
                  )
               )
         ),
-    tabPanel("Interprate the result"),
+    # Tab: Prepare input data ----
+    tabPanel("Input preparation",
+             sidebarLayout(
+               sidebarPanel(
+                 # Application title
+
+                 h2("Upload watershed Shapefile"),
+                 HTML("<p>Please chose a '*gml' file to upload.</p>
+                      "),
+                 fileInput('Input_basin', 'Choose watershed shapefile', multiple=FALSE, accept="gml"),
+                 # Action: Plot basin ----
+                 actionButton("plotbasin","Plot the uploaded watershed!")
+               ),
+
+               # MainPanel for upload data----
+               mainPanel(
+                 ## Output: Head of the selected plotting file----
+                 h2("The Map of the Watershed"),
+                 leafletOutput("basinmap")
+               )
+             )
+      ),
     navbarMenu("Export result",
                tabPanel("Export water",
 

@@ -42,7 +42,7 @@ theme_ning<-function(size.axis=5,size.title=6){
 #          "trend","gmodels","vcd","abind","Evapotranspiration","chron",
 #          "xts","dplyr","hydroGOF")
 
-librs<-c("dplyr","raster","ggplot2","leaflet","rgdal")
+librs<-c("dplyr","raster","ggplot2","leaflet","rgdal","rgeos")
 f_lib_check(librs)
 
 # # load revised "hydromad" package
@@ -67,22 +67,53 @@ shinyServer(function(input, output,session) {
                       selected = tail(x, 1)
     )
   })
-  BasinShp<-NULL
+
+
   ## Read Basin shapefile ----
+  BasinShp<-NULL
   observeEvent(input$Input_basin,{
-    BasinShp<<- readOGR(input$Input_basin$datapath)
+    Basins<- readOGR(input$Input_basin$datapath)
+    Basins$BasinID<-c(1:length(Basins[,1]))
+
+    # Add latitude and longitude infor to the Basin
+    if(!"Latitude"  %in% names(Basins)) {
+
+      # get the contral coordinates of each polygon
+     if(is.na(Basins)) proj4string(Basins)<-CRS("+init=epsg:4326")
+      Basins_wgs<-spTransform(Basins,CRS("+init=epsg:4326"))
+      Basin_coords<-gCentroid(Basins_wgs, byid=TRUE)
+      rownames(Basin_coords@coords)<-Basins$BasinID
+      Basin_coords<-as.data.frame(Basin_coords)
+
+      Basins[["Latitude"]]=Basin_coords$y
+      Basins[["Longitude"]]=Basin_coords$x
+
+      # Get the area of each polygon
+     if (!is.projected(Basins)){
+       Basins_pro<-spTransform(Basins,CRS("+init=epsg:3857"))
+       Basins[["Area_m2"]]=round(gArea(Basins_pro,byid = T),2)
+     }else{
+       Basins[["Area_m2"]]=round(gArea(Basins,byid = T),2)
+     }
+
+    }
+    BasinShp<<-Basins
   })
+
 
   ## Plot Basin ----
   observeEvent(input$plotbasin,{
+
+  # Plot the BasinShp
   output$basinmap <- renderLeaflet({
     if(is.null(BasinShp)) return()
-    popup = BasinShp$Station
     leaflet()  %>% addTiles() %>%
       #setView(lng = llong, lat=llat,zoom=13) %>%
-      addPolygons(data=BasinShp,weight=1,col = 'black',fillOpacity = 0.2,fillColor = BasinShp$Station,
+      addPolygons(data=BasinShp,weight=1,col = 'black',fillOpacity = 0.2,
                   highlight = highlightOptions(color='white',weight=1,
-                                               bringToFront = TRUE), label= popup)
+                                               bringToFront = TRUE))%>%
+      addMarkers(lng = BasinShp$Longitude, lat = BasinShp$Latitude,
+                 popup = as.character(BasinShp$BasinID),label = paste0("BasinID = ",BasinShp$BasinID))
   })
 })
 
