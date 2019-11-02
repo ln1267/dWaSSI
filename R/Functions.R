@@ -947,6 +947,7 @@ f_2raster<-function(data,infonc=NA){
 f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,start,scale="month",df=T,weight=T,plot=T){
   require(dplyr)
   require(raster)
+  require(tidyr)
   da<-brick(ncfilename)
   da<-crop(da,basin)
   #NAvalue(da)<- 0
