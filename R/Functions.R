@@ -118,7 +118,7 @@ hru_lc_zonal<-function(classname,daname,shp,fun='mean',field=NULL,plot=T){
     class1<-raster::mask(class1,polygon1)
     da1<-raster::mask(da1,polygon1)
     da_zonal1<-zonal(da1, class1, fun)
-    namesls<-paste0("Class_",da_zonal1[,1])
+    namesls<-paste0("Lc_",da_zonal1[,1])
     da_zonal1<-t(da_zonal1[,-1])
     colnames(da_zonal1)<-namesls
     return(da_zonal1)
@@ -130,7 +130,7 @@ hru_lc_zonal<-function(classname,daname,shp,fun='mean',field=NULL,plot=T){
     names(da_zonal)<-shp@data[,field]
   }else{
     da_zonal<-zonal(da, class, fun)
-    namesls<-paste0("Class_",da_zonal)
+    namesls<-paste0("Lc_",da_zonal)
     da_zonal<-t(da_zonal[,-1])
     colnames(da_zonal)<-namesls
   }
@@ -156,7 +156,7 @@ hru_lc_zonal<-function(classname,daname,shp,fun='mean',field=NULL,plot=T){
 #' @export
 # this function is used for zonal vegetation ratio of each HRU in by a shp file
 
-hru_lc_ratio<-function(classname,shp,field=NULL,mcores=10){
+hru_lc_ratio<-function(classname,shp,field=NULL,mcores=1){
   library(raster)
   class<-raster(classname)
   class<-crop(class,shp)
@@ -945,47 +945,55 @@ f_2raster<-function(data,infonc=NA){
 #' basin,fun="mean",varname="ET",zonal_field="Station",start=1982,scale="annual")
 #'
 f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,start,scale="month",df=T,weight=T,plot=T){
-  require(reshape2)
+  require(dplyr)
   require(raster)
   da<-brick(ncfilename)
   da<-crop(da,basin)
-  NAvalue(da)<- 0
+  #NAvalue(da)<- 0
   if(plot) {
     plot(da[[1]],basin)
     plot(basin,add=T)
   }
   if(fun=="mean" | fun=="Mean" | fun=="MEAN"){
-    ex <- raster::extract(da, basin, fun=mean, na.rm=TRUE, df=df,weights=weight)
+    ex <- raster::extract(da, basin, fun=mean, na.rm=TRUE, weights=weight)
   }else{
-    ex <- raster::extract(da, basin, fun=sum, na.rm=TRUE, df=df)
+    ex <- raster::extract(da, basin, fun=sum, na.rm=TRUE)
   }
 
   if (df){
-    sta_catchment<-as.data.frame(t(ex[-1]))
+    sta_catchment<-t(ex)%>%
+      round(digits = 3)%>%
+      as.data.frame()%>%
+      gather(BasinID,values)
 
     if(scale=="month" | scale=="Month" | scale=="MONTH"){
       dates<-seq(as.Date(paste(start,"01-01",sep="-")),by="1 month",length.out = dim(da)[3])
-      sta_catchment$Year<-as.integer(format(dates,"%Y"))
-      sta_catchment$Month<-as.integer(format(dates,"%m"))
-      names(sta_catchment)<-c(as.character(basin[[zonal_field]]),"Year","Month")
-      sta_catchment<-melt(sta_catchment,id=c("Year","Month"))
-      names(sta_catchment)<-c("Year","Month",zonal_field,varname)
+      sta_catchment<-sta_catchment%>%
+        mutate(Year=as.integer(format(dates,"%Y")),
+               Month=as.integer(format(dates,"%m")),
+               BasinID=rep(basin[[zonal_field]],each=length(dates)))%>%
+        select(BasinID,Year,Month,values)
+      names(sta_catchment)<-c(zonal_field,"Year","Month",varname)
 
     }else if(scale=="annual" | scale=="Annual" | scale=="ANNUAL"){
       dates<-seq(as.Date(paste(start,"01-01",sep="-")),by="1 year",length.out = dim(da)[3])
-      sta_catchment$Year<-as.integer(format(dates,"%Y"))
-      names(sta_catchment)<-c(as.character(basin[[zonal_field]]),"Year")
-      sta_catchment<-melt(sta_catchment,id=c("Year"))
-      names(sta_catchment)<-c("Year",zonal_field,varname)
+      sta_catchment<-sta_catchment%>%
+        mutate(Year=as.integer(format(dates,"%Y")),
+               BasinID=rep(basin[[zonal_field]],each=length(dates)))%>%
+        select(BasinID,Year,values)
+      names(sta_catchment)<-c(zonal_field,"Year",varname)
 
     }else{
       dates<-seq(as.Date(paste(start,"01-01",sep="-")),by="1 day",length.out = dim(da)[3])
-      sta_catchment$Year<-as.integer(format(dates,"%Y"))
-      sta_catchment$Month<-as.integer(format(dates,"%m"))
-      sta_catchment$Day<-as.integer(format(dates,"%d"))
-      names(sta_catchment)<-c(as.character(basin[[zonal_field]]),"Year","Month","Day")
-      sta_catchment<-melt(sta_catchment,id=c("Year","Month","Day"))
-      names(sta_catchment)<-c("Year","Month","Day",zonal_field,varname)
+
+      sta_catchment<-sta_catchment%>%
+        mutate(Year=as.integer(format(dates,"%Y")),
+               Month=as.integer(format(dates,"%m")),
+               Day=as.integer(format(dates,"%d")),
+               BasinID=rep(basin[[zonal_field]],each=length(dates)))%>%
+        select(BasinID,Year,Month,Day,values)
+      names(sta_catchment)<-c(zonal_field,"Year","Month","Day",varname)
+
     }
   }else{
     sta_catchment<-ex
@@ -1004,7 +1012,6 @@ f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,start,sca
     }
 
   }
-  sta_catchment[varname]<-round(sta_catchment[varname],3)
   sta_catchment
 }
 
