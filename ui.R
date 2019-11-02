@@ -31,11 +31,10 @@ shinyUI(
                  HTML("<p>You can prepare those files as a 'csv/txt' format.</p>
                       "),
                  ## Choose each file----
-                 fileInput("Input_HRUinfo", "Watershed info [HRUID, Latitude, Longitude, Elevation_m and Area_m2]"),
+                 fileInput("Input_cellinfo", "Cellinfo [HRUID, Latitude, Longitude, Elevation_m, Area_m2 and ratio for each lc]"),
                  fileInput("Input_climate", "Monthly Climate [HRUID, Year, Month, Precip_mm, Tmean_C]"),
                  fileInput("Input_LAI", "Monthly LAI [HRUID, Year, Month, LAI]"),
-                 fileInput("Input_landinfo", "Land cover info [HRUID, IGBP,Ratio]"),
-                 fileInput("Input_soil", "Soil info [HRUID, uztwm,uzfwm,uzk,zperc,rexp,lztwm,lzfsm,lzfpm,lzsk,lzpk,pfree]")
+                 fileInput("Input_soilinfo", "Soil info [HRUID, uztwm,uzfwm,uzk,zperc,rexp,lztwm,lzfsm,lzfpm,lzsk,lzpk,pfree]")
 
                ),
 
@@ -44,6 +43,51 @@ shinyUI(
                  ## Output: Summary of the selected plotting file----
                  h2("The summary of the input file"),
                  verbatimTextOutput("printsummary")
+               )
+             )
+    ),
+    # Tab: Prepare input data ----
+    tabPanel("Input preparation",
+             sidebarLayout(
+               sidebarPanel(
+                 # Application title
+
+                 h2("Upload watershed Shapefile and other raster data"),
+                 HTML("<p>Please chose a '*gml' file to upload.</p>
+                      "),
+                 fileInput('Input_basin', 'Choose watershed shapefile', multiple=FALSE, accept="gml"),
+
+                 #h2("Upload all original raster files"),
+                 HTML("<p>Please chose a '*.tif' or '*.nc' monthly stacked precipitation and temperation file to upload.</p>
+                      "),
+                 fileInput('Input_dem_raster', 'Choose elevation raster file', multiple=FALSE, accept="tif"),
+                 fileInput('Input_temp_raster', 'Choose temperature raster file', multiple=FALSE, accept="tif"),
+                 fileInput('Input_precp_raster', 'Choose precipitation raster file', multiple=FALSE, accept="tif"),
+                 fileInput('Input_lc_raster', 'Choose land cover raster file', multiple=FALSE, accept="tif"),
+                 fileInput('Input_lai_raster', 'Choose LAI raster file', multiple=FALSE, accept="tif"),
+                 fileInput('Input_soil_raster', 'Choose Soil raster file', multiple=FALSE, accept="tif"),
+                 fileInput('Input_imp_raster', 'Choose impverious raster file [Optional]', multiple=FALSE, accept="tif"),
+
+                 # Action: Plot basin ----
+                 actionButton("processrasters","process input"),
+                 # Action: Process input ----
+                 actionButton("plotrasterdata","Plot the input rasters!")
+
+               ),
+
+               # MainPanel for upload data----
+               mainPanel(
+                 ## Output: Head of the selected plotting file----
+                 # h2("The Map of the Watershed"),
+                 # leafletOutput("basinmap"),
+
+
+                 h2("Plot mean climate data"),
+                 HTML("<p>It will take a while for the data process. Please wait ...</p>
+                      "),
+                 verbatimTextOutput("prntraster"),
+                 verbatimTextOutput("prntinfo"),
+                 leafletOutput("basinrastermap")
                )
              )
     ),
@@ -72,8 +116,10 @@ shinyUI(
 
                  ## Output: Plot of the selected two columns----
                  h2("Please select two columns to plot the data"),
+                 verbatimTextOutput("prntplotinfo"),
                  verbatimTextOutput("distPloterror"),
-                 plotOutput("Plotinput")
+
+                 plotOutput("Plotinput",height = 800)
                )
              )
     ),
@@ -176,49 +222,6 @@ shinyUI(
                  )
               )
         ),
-    # Tab: Prepare input data ----
-    tabPanel("Input preparation",
-             sidebarLayout(
-               sidebarPanel(
-                 # Application title
-
-                 h2("Upload watershed Shapefile"),
-                 HTML("<p>Please chose a '*gml' file to upload.</p>
-                      "),
-                 fileInput('Input_basin', 'Choose watershed shapefile', multiple=FALSE, accept="gml"),
-
-                 h2("Upload all original raster files"),
-                 HTML("<p>Please chose a '*.tif' or '*.nc' monthly stacked precipitation and temperation file to upload.</p>
-                      "),
-                 fileInput('Input_dem_raster', 'Choose elevation raster file', multiple=FALSE, accept="tif"),
-                 fileInput('Input_temp_raster', 'Choose temperature raster file', multiple=FALSE, accept="tif"),
-                 fileInput('Input_precp_raster', 'Choose precipitation raster file', multiple=FALSE, accept="tif"),
-                 fileInput('Input_lc_raster', 'Choose land cover raster file', multiple=FALSE, accept="tif"),
-                 fileInput('Input_imp_raster', 'Choose impverious raster file', multiple=FALSE, accept="tif"),
-                 fileInput('Input_lai_raster', 'Choose LAI raster file', multiple=FALSE, accept="tif"),
-
-                 # Action: Plot basin ----
-                 actionButton("processrasters","process input"),
-                 # Action: Process input ----
-                 actionButton("plotrasterdata","Plot the input rasters!")
-
-               ),
-
-               # MainPanel for upload data----
-               mainPanel(
-                 ## Output: Head of the selected plotting file----
-                 # h2("The Map of the Watershed"),
-                 # leafletOutput("basinmap"),
-
-
-                 h2("Plot mean climate data"),
-                 HTML("<p>It will take a while for the data process. Please wait ...</p>
-                      "),
-                 verbatimTextOutput("prntraster"),
-                 leafletOutput("basinrastermap")
-               )
-             )
-      ),
     navbarMenu("Export result",
                tabPanel("Export water",
 
