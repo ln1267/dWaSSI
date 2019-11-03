@@ -5,47 +5,6 @@
 
 library(shiny)
 
-# if ("devtools" %in% installed.packages()) {library(devtools)} else{install.package("devtools") }
-
-# function for checking libs
-f_lib_check<-function(libs){
-  for (lib in libs ){
-    if(lib %in% rownames(installed.packages())){
-
-    }else{
-      install.packages(lib,repos='http://cran.us.r-project.org')
-    }
-  }
-
-  a<-lapply(libs, require, character.only = TRUE)
-}
-theme_ning<-function(size.axis=5,size.title=6){
-  theme_bw(base_family = "serif") %+replace%
-    theme(axis.title = element_text(face="bold", colour="black", size=size.title),
-          axis.text= element_text(angle=0, vjust=0.3, size=size.axis),
-          legend.title = element_text(colour="black", size=size.axis, face="bold"),
-          legend.text = element_text(colour="black", size = size.axis),
-          strip.text.x = element_text(size = size.axis,margin=margin(4, 2, 6, 2), face="bold"),
-          strip.text.y = element_text(size = size.axis,margin=margin(4, 2, 4, 6), face="bold",angle=-90),
-          legend.key.size=unit(1.2, "lines"),
-          legend.box.spacing=unit(1, "mm"),
-          strip.background = element_blank(),
-          plot.title = element_text(vjust = 2.5,hjust = 0.5,face="bold")
-    )
-}
-# librs<-c("plyr","bfast","ggplot2","ggrepel","reshape2","pryr","ncdf4",
-#          "caTools","graphics","parallel","zoo","RColorBrewer",
-#          "trend","gmodels","vcd","abind","Evapotranspiration","chron",
-#          "xts","dplyr","hydroGOF")
-
-librs<-c("dplyr","raster","ggplot2","leaflet","rgdal","rgeos","leaflet.extras")
-f_lib_check(librs)
-
-# # load revised "hydromad" package
-# if (!"hydromad" %in% installed.packages()) install_github("ln1267/hydromad")
-# load required libraries
-#library(hydromad)
-
 # Define server logic required to draw a histogram
 shinyServer(function(input, output,session) {
   options(shiny.maxRequestSize=30*1024^2)
@@ -53,7 +12,7 @@ shinyServer(function(input, output,session) {
   # Define the info printing
   inforprint<-reactiveValues(reading=NULL,
                             processing="Data process log:",
-                            plotting=NULL)
+                            plotting="Plotting log: ")
   f_addinfo<-function(tab,content=NULL){
     inforprint[[tab]]<<-paste(inforprint[[tab]],content,sep="\n")
   }
@@ -193,6 +152,7 @@ shinyServer(function(input, output,session) {
     }
     # Print the summary of the input
       output$prntraster<-renderPrint({
+        if(length(data_input)<1) return("No data!")
         for (i in 1:length(data_input)){
           var<-names(data_input)[i]
           df<-data_input[[i]]
@@ -319,6 +279,11 @@ shinyServer(function(input, output,session) {
   })
 
   # Tab: Plot input data----
+  ## Print: Print the processig infor ----
+  output$printplottinginfo<-renderPrint({
+    if(!is.null(inforprint$plotting)) writeLines(inforprint$plotting)
+  })
+
   ## Plot: Plot selected input data ----
   output$Plotinput <- renderPlot({
 
@@ -328,6 +293,10 @@ shinyServer(function(input, output,session) {
       if(!input$daname2plot %in% names(data_input)) {
         inforprint$info<-"no data"
         return()}
+      if(!input$plotvar %in% names(data_input[[input$daname2plot]])) {
+        f_addinfo("plotting","The variable is not in the dataset")
+        return()
+      }
       df<-data_input[[input$daname2plot]]%>%
           filter(Year>=input$plotyrrange[1] & Year<=input$plotyrrange[2])%>%
           filter(Month %in% input$plotmonths)%>%
@@ -364,145 +333,6 @@ shinyServer(function(input, output,session) {
     }
 
   })
-
-
-  ## UI$columns: Select two columns for ploting----
-  output$column1 <- renderUI({
-    # If missing input, return to avoid error later in function
-    if(is.null(input$file2plot)){
-      df <- f_read_csv("test.csv",
-                       filesep =  input$sep
-      )
-      columns<-names(df)
-    }else{
-      df <- f_read_csv(input$file2plot,
-                       filesep =  input$sep
-      )
-      columns<-names(df)
-    }
-
-    # Create the checkboxes and select them all by default
-    selectInput("column1", "Select the X - axis column for plotting",
-                choices  = columns
-    )
-  })
-  output$column2 <- renderUI({
-    # If missing input, return to avoid error later in function
-    if(is.null(input$file2plot)){
-      df <- f_read_csv("test.csv",
-                       filesep =  input$sep
-      )
-      columns<-names(df)
-    }else{
-      df <- f_read_csv(input$file2plot,
-                       filesep =  input$sep
-      )
-      columns<-names(df)
-    }
-
-    # Create the checkboxes and select them all by default
-    selectInput("column2", "Select the Y - axis for plotting",
-                choices  = columns
-    )
-  })
-  ## output$contents: Print the table of a selected uploaded file ----
-  output$contents <- renderTable({
-    # input$file1 will be NULL initially. After the user selects
-    # and uploads a file, head of that data file by default,
-    # or all rows if selected, will be shown.
-
-    req(input$file2plot)
-
-    df <- f_read_csv(input$file2plot,
-                     filesep =  input$sep
-    )
-
-    return(head(df))
-  })
-
-  # Mainpanel:----
-  ## output$summary: Print the summary of a selected uploaded file  ----
-  output$summary <- renderPrint({
-    # input$file1 will be NULL initially. After the user selects
-    # and uploads a file, head of that data file by default,
-    # or all rows if selected, will be shown.
-
-    req(input$file2plot)
-
-    df <- f_read_csv(input$file2plot,
-                     filesep =  input$sep
-    )
-    return(summary(df))
-
-  })
-  ## output$distPloterror: Print the error info for plotting ----
-  output$distPloterror <- renderPrint({
-    # generate bins based on input$bins from ui.R
-    req(input$file2plot)
-    req(input$daterange1)
-    if(is.null(input$file2plot)){
-      df <- f_read_csv("test.csv",
-                       filesep =  input$sep
-      )
-      columns<-names(df)
-    }else{
-      df <- f_read_csv(input$file2plot,
-                       filesep =  input$sep
-      )
-      columns<-names(df)
-    }
-
-    x=df[,input$column1]
-    y=df[,input$column2]
-    xlab=input$column1;ylab = input$column2
-
-    if(input$column1=="Timestamp"){
-      daterange<-input$daterange1
-      if(range(df$Timestamp)[1]>daterange[1]) return(print(paste0("The start date should be later than ",range(df$Timestamp)[1])))
-      if(range(df$Timestamp)[2]<daterange[2]) return(print(paste0("The end date should be earler than ",range(df$Timestamp)[2])))
-      df<-subset(df, Timestamp>=daterange[1] & Timestamp<=daterange[2])
-    }
-  })
-
-  ## output$distPlot: Plot the select file ----
-  output$distPlot <- renderPlot({
-    # generate bins based on input$bins from ui.R
-    req(input$file2plot)
-    req(input$daterange1)
-    if(is.null(input$file2plot)){
-      df <- f_read_csv("test.csv",
-                       filesep =  input$sep
-      )
-      columns<-names(df)
-    }else{
-      df <- f_read_csv(input$file2plot,
-                       filesep =  input$sep
-      )
-      columns<-names(df)
-    }
-
-    x=df[,input$column1]
-    y=df[,input$column2]
-    xlab=input$column1;ylab = input$column2
-
-    if(input$column1=="Timestamp"){
-      daterange<-input$daterange1
-      if(range(df$Timestamp)[1]>daterange[1]) return(print(paste0("The start date should be later than ",range(df$Timestamp)[1])))
-      if(range(df$Timestamp)[2]<daterange[2]) return(print(paste0("The end date should be earler than ",range(df$Timestamp)[2])))
-      df<-subset(df, Timestamp>=daterange[1] & Timestamp<=daterange[2])
-      x=df[,input$column1]
-      y=df[,input$column2]
-    }
-
-    if(input$type1=="line"){
-      plot(x,y,xlab=xlab,ylab =ylab,"l")
-      points(x,y)
-    }else if(input$type1=="point")
-      plot(x,y,xlab=xlab,ylab =ylab)
-  },
-  height=800,
-  res = 100)
-
 
   # Tab: simulation----
   # Sidepanel: ----
