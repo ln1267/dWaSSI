@@ -54,6 +54,7 @@ shinyServer(function(input, output,session) {
   ## Action: Read Basin shapefile ----
   if (!exists("BasinShp")) BasinShp<-NULL
   observeEvent(input$Input_basin,{
+    inforprint$processing<-"Processing log: "
     f_addinfo("processing","Reading shapfile ...")
     Basins<- readOGR(input$Input_basin$datapath)
     Basins$BasinID<-c(1:length(Basins[,1]))
@@ -91,6 +92,7 @@ shinyServer(function(input, output,session) {
 
   observeEvent(input$processrasters,{
 
+    inforprint$processing<-"Processing log: "
     if (is.null(BasinShp)) {
       f_addinfo("processing","You need to upload a shapefile including the basins.")
       return()
@@ -286,7 +288,7 @@ shinyServer(function(input, output,session) {
 
   ## Plot: Plot selected input data ----
   observeEvent(input$plotdata,{
-
+        inforprint$plotting<-"Plotting log: "
         print(paste0("Print data ....",input$daname2plot))
         f_addinfo("plotting","Print the selected data ...")
         if(!input$daname2plot %in% names(data_input)) {
@@ -295,7 +297,7 @@ shinyServer(function(input, output,session) {
         plotvars<-strsplit(input$plotvar,",")[[1]]
         if(input$daname2plot=="LAI" & sum(plotvars %in% names(data_input[[input$daname2plot]]))<1) {
 
-          f_addinfo("plotting",paste0("You can select these variables: ",names(data_input[[input$daname2plot]])))
+          f_addinfo("plotting",paste0("You can select these variables from LAI data: ",paste(names(data_input[[input$daname2plot]]),collapse=",")))
           return()
         }
         basinids<-as.integer(strsplit(input$plotBasinID,",")[[1]])
@@ -316,26 +318,30 @@ shinyServer(function(input, output,session) {
           return()}
 
     output$Plotinput <- renderPlot({
-
+        input$plotdata
         if(input$daname2plot == "Climate"){
 
           p1<-ggplot(df,aes(x=Date,y=Ppt_mm))+geom_line()+geom_point()+
             ggtitle(paste0("Monthly Precipitation (mm/month)"))+
             facet_wrap(BasinID~.,ncol=3)+
+            scale_x_date(date_breaks = "1 year", date_labels = "%Y")+
             theme_ning(size.axis = 12,size.title = 14)
           p2<-ggplot(df,aes(x=Date,y=Tavg_C))+geom_line()+geom_point()+
             ggtitle(paste0("Monthly mean temperature (C)"))+
-            facet_wrap(BasinID~.,ncol=3)+
+            facet_wrap(BasinID~.,ncol=2)+
+            scale_x_date(date_breaks = "1 year", date_labels = "%Y")+
             theme_ning(size.axis = 12,size.title = 14)
 
           multiplot(p1,p2,cols = 1)
 
         }else if(input$daname2plot == "LAI"){
-          df%>%
-            filter()%>%
-          ggplot(aes(x=Date,y=LAI,col=vars))+geom_line()+geom_point()+
+         df%>%
+            dplyr::select(one_of(c("BasinID","Date"),plotvars))%>%
+            gather(Lcs,LAI,plotvars)%>%
+            ggplot(aes(x=Date,y=LAI,col=Lcs))+geom_line()+geom_point()+
             ggtitle(paste0("Monthly Leaf area index (m2/m2)"))+
-            facet_wrap(BasinID~.,ncol=3)+
+            facet_wrap(BasinID~.,ncol=2)+
+            scale_x_date(date_breaks = "1 year", date_labels = "%Y")+
             theme_ning(size.axis = 12,size.title = 14)
 
         }

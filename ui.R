@@ -109,7 +109,7 @@ shinyUI(
                  # Input: Year for plotting ---
                  sliderInput("plotyrrange", "Select the year range", 1970, 2017, value = c(2000, 2010)),
                  # Input: Month ----
-                 checkboxGroupInput("plotmonths","Select the months to plot",c(1:12),selected=c(6:11),inline=T),
+                 checkboxGroupInput("plotmonths","Select the months to plot",c(1:12),selected=c(1:12),inline=T),
 
                  # Action: plot input data ----
                  actionButton("plotdata","Plot the selected input data!")
