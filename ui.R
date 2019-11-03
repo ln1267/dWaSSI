@@ -42,6 +42,7 @@ shinyUI(
                mainPanel(
                  ## Output: Summary of the selected plotting file----
                  h2("The summary of the input file"),
+                 verbatimTextOutput("printreadinginfo"),
                  verbatimTextOutput("printsummary")
                )
              )
@@ -85,8 +86,9 @@ shinyUI(
                  h2("Plot mean climate data"),
                  HTML("<p>It will take a while for the data process. Please wait ...</p>
                       "),
+                 verbatimTextOutput("printprocessinginfo"),
                  verbatimTextOutput("prntraster"),
-                 verbatimTextOutput("prntinfo"),
+
                  leafletOutput("basinrastermap")
                )
              )
