@@ -944,7 +944,7 @@ f_2raster<-function(data,infonc=NA){
 #' sta_shp<-f_sta_shp_nc(ncfilename="/Dataset/backup/CABLE/ET_ann_82_14.nc",
 #' basin,fun="mean",varname="ET",zonal_field="Station",start=1982,scale="annual")
 #'
-f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,start,scale="month",df=T,weight=T,plot=T){
+f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,start,scale="month",weight=T,plot=T){
   require(dplyr)
   require(raster)
   require(tidyr)
@@ -961,61 +961,48 @@ f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,start,sca
     ex <- raster::extract(da, basin, fun=sum, na.rm=TRUE)
   }
 
-  if (df){
+  if(scale=="month" | scale=="Month" | scale=="MONTH"){
+    dates<-seq(as.Date(paste0(start,"-01-01")),by="1 month",length.out = dim(da)[3])
     sta_catchment<-t(ex)%>%
       round(digits = 3)%>%
       as.data.frame()%>%
-      gather(BasinID,values)
+      mutate(Year=as.integer(format(dates,"%Y")),
+             Month=as.integer(format(dates,"%m")))%>%
+      gather(BasinID,values,1:length(basin))%>%
+      mutate(BasinID=rep(basin[[zonal_field]],each=length(dates)))%>%
+      dplyr::select(BasinID,Year,Month,values)
+    names(sta_catchment)<-c(zonal_field,"Year","Month",varname)
 
-    if(scale=="month" | scale=="Month" | scale=="MONTH"){
-      dates<-seq(as.Date(paste(start,"01-01",sep="-")),by="1 month",length.out = dim(da)[3])
-      sta_catchment<-sta_catchment%>%
-        mutate(Year=as.integer(format(dates,"%Y")),
-               Month=as.integer(format(dates,"%m")),
-               BasinID=rep(basin[[zonal_field]],each=length(dates)))%>%
-        dplyr::select(BasinID,Year,Month,values)
-      names(sta_catchment)<-c(zonal_field,"Year","Month",varname)
+  }else if(scale=="annual" | scale=="Annual" | scale=="ANNUAL"){
+    dates<-seq(as.Date(paste0(start,"-01-01")),by="1 year",length.out = dim(da)[3])
+    sta_catchment<-t(ex)%>%
+      round(digits = 3)%>%
+      as.data.frame()%>%
+      mutate(Year=as.integer(format(dates,"%Y")))%>%
+      gather(BasinID,values,1:length(basin))%>%
+      mutate(BasinID=rep(basin[[zonal_field]],each=length(dates)))%>%
+      dplyr::select(BasinID,Year,values)
 
-    }else if(scale=="annual" | scale=="Annual" | scale=="ANNUAL"){
-      dates<-seq(as.Date(paste(start,"01-01",sep="-")),by="1 year",length.out = dim(da)[3])
-      sta_catchment<-sta_catchment%>%
-        mutate(Year=as.integer(format(dates,"%Y")),
-               BasinID=rep(basin[[zonal_field]],each=length(dates)))%>%
-        dplyr::select(BasinID,Year,values)
-      names(sta_catchment)<-c(zonal_field,"Year",varname)
+    names(sta_catchment)<-c(zonal_field,"Year",varname)
 
-    }else{
-      dates<-seq(as.Date(paste(start,"01-01",sep="-")),by="1 day",length.out = dim(da)[3])
-
-      sta_catchment<-sta_catchment%>%
-        mutate(Year=as.integer(format(dates,"%Y")),
-               Month=as.integer(format(dates,"%m")),
-               Day=as.integer(format(dates,"%d")),
-               BasinID=rep(basin[[zonal_field]],each=length(dates)))%>%
-        dplyr::select(BasinID,Year,Month,Day,values)
-      names(sta_catchment)<-c(zonal_field,"Year","Month","Day",varname)
-
-    }
   }else{
-    sta_catchment<-ex
+    dates<-seq(as.Date(paste0(start,"-01-01")),by="1 day",length.out = dim(da)[3])
 
-    if(scale=="month" | scale=="Month" | scale=="MONTH"){
-      # names(sta_catchment)<-as.character(seq(as.Date(paste(start,"01-01",sep="-")),by="1 month",length.out = dim(da)[3]))
-      rownames(sta_catchment)<-as.character(basin[[zonal_field]])
-
-    }else if(scale=="annual" | scale=="Annual" | scale=="ANNUAL"){
-      # names(sta_catchment)<-as.character(seq(as.Date(paste(start,"01-01",sep="-")),by="1 year",length.out = dim(da)[3]))
-      rownames(sta_catchment)<-as.character(basin[[zonal_field]])
-
-    }else{
-      #  names(sta_catchment)<-as.character(seq(as.Date(paste(start,"01-01",sep="-")),by="1 day",length.out = dim(da)[3]))
-      rownames(sta_catchment)<-as.character(basin[[zonal_field]])
-    }
+    sta_catchment<-t(ex)%>%
+      round(digits = 3)%>%
+      as.data.frame()%>%
+      mutate(Year=as.integer(format(dates,"%Y")),
+             Month=as.integer(format(dates,"%m")),
+             Day=as.integer(format(dates,"%d")))%>%
+      gather(BasinID,values,1:length(basin))%>%
+      mutate(BasinID=rep(basin[[zonal_field]],each=length(dates)))%>%
+      dplyr::select(BasinID,Year,Month,Day,values)
+    names(sta_catchment)<-c(zonal_field,"Year","Month","Day",varname)
 
   }
+
   sta_catchment
 }
-
 ## Paste one to one for two vectors, matrixes or arrays----
 #' Paste by value one to one for two vectors, matrixes or arrays
 #' @param x The first object, which can be vector, matrix or array.
