@@ -285,55 +285,62 @@ shinyServer(function(input, output,session) {
   })
 
   ## Plot: Plot selected input data ----
-  output$Plotinput <- renderPlot({
+  observeEvent(input$plotdata,{
 
-    if(input$plotdata>0){
-      print(paste0("Print data ....",input$daname2plot))
-      inforprint$info<-paste0("Print data ....",input$daname2plot)
-      if(!input$daname2plot %in% names(data_input)) {
-        inforprint$info<-"no data"
-        return()}
-      if(!input$plotvar %in% names(data_input[[input$daname2plot]])) {
-        f_addinfo("plotting","The variable is not in the dataset")
-        return()
-      }
-      df<-data_input[[input$daname2plot]]%>%
-          filter(Year>=input$plotyrrange[1] & Year<=input$plotyrrange[2])%>%
-          filter(Month %in% input$plotmonths)%>%
-          mutate(Date=as.Date(paste0(Year,"-",Month,"-","01")))%>%
-          dplyr::select(-Year,-Month)
-      if(nrow(df)<1) {
-        inforprint$info<-"no data"
-        return()}
+        print(paste0("Print data ....",input$daname2plot))
+        f_addinfo("plotting","Print the selected data ...")
+        if(!input$daname2plot %in% names(data_input)) {
+          f_addinfo("plotting","It does have this data.")
+          return()}
+        plotvars<-strsplit(input$plotvar,",")[[1]]
+        if(sum(plotvars %in% names(data_input[[input$daname2plot]]))<1) {
 
-      if(input$daname2plot == "Climate"){
+          f_addinfo("plotting",paste0("You can select these variables: ",names(data_input[[input$daname2plot]])))
+          return()
+        }
+        basinids<-as.integer(strsplit(input$plotBasinID,",")[[1]])
+        if(sum(basinids %in% data_input[[input$daname2plot]]$BasinID)<1) {
 
-        names(df)<-c("HRU_ID","Precip","Tmean","Date")
-        df$HRU_ID<-factor(df$HRU_ID)
-        p1<-ggplot(df,aes(x=Date,y=Precip,col=HRU_ID))+geom_line()+geom_point()+
-          ggtitle(paste0("Monthly Precipitation (mm/month)"))+
-          facet_wrap(HRU_ID~.,ncol=3)+
-          theme_ning(size.axis = 12,size.title = 14)
-        p2<-ggplot(df,aes(x=Date,y=Tmean,col=HRU_ID))+geom_line()+geom_point()+
-          ggtitle(paste0("Monthly mean temperature (C)"))+
-          facet_wrap(HRU_ID~.,ncol=3)+
-          theme_ning(size.axis = 12,size.title = 14)
-        #print(p1)
-        multiplot(p1,p2,cols = 1)
-      }else if(input$daname2plot == "LAI"){
-        names(df)<-c("HRU_ID","LAI","Date")
-        df$HRU_ID<-factor(df$HRU_ID)
-        ggplot(df,aes(x=Date,y=LAI,col=HRU_ID))+geom_line()+geom_point()+
-          ggtitle(paste0("Monthly Leaf area index (m2/m2)"))+
-          facet_wrap(HRU_ID~.,ncol=3)+
-          theme_ning(size.axis = 12,size.title = 14)
+          f_addinfo("plotting",paste0("It doesn't have this BasinID: ",basinids))
+          return()
+        }
+        df<-data_input[[input$daname2plot]]%>%
+            filter(BasinID %in% basinids)%>%
+            mutate(BasinID=factor(df$BasinID))%>%
+            filter(Year>=input$plotyrrange[1] & Year<=input$plotyrrange[2])%>%
+            filter(Month %in% input$plotmonths)%>%
+            mutate(Date=as.Date(paste0(Year,"-",Month,"-","01")))
+        if(nrow(df)<1) {
+          f_addinfo("plotting","No data!")
+          return()}
 
-      }
+    output$Plotinput <- renderPlot({
 
-    }
+        if(input$daname2plot == "Climate"){
 
+          p1<-ggplot(df,aes(x=Date,y=Ppt_mm))+geom_line()+geom_point()+
+            ggtitle(paste0("Monthly Precipitation (mm/month)"))+
+            facet_wrap(BasinID~.,ncol=3)+
+            theme_ning(size.axis = 12,size.title = 14)
+          p2<-ggplot(df,aes(x=Date,y=Tavg_C))+geom_line()+geom_point()+
+            ggtitle(paste0("Monthly mean temperature (C)"))+
+            facet_wrap(BasinID~.,ncol=3)+
+            theme_ning(size.axis = 12,size.title = 14)
+
+          multiplot(p1,p2,cols = 1)
+
+        }else if(input$daname2plot == "LAI"){
+          df%>%
+            filter()%>%
+          ggplot(aes(x=Date,y=LAI,col=vars))+geom_line()+geom_point()+
+            ggtitle(paste0("Monthly Leaf area index (m2/m2)"))+
+            facet_wrap(BasinID~.,ncol=3)+
+            theme_ning(size.axis = 12,size.title = 14)
+
+        }
+
+      })
   })
-
   # Tab: simulation----
   # Sidepanel: ----
 
