@@ -1,10 +1,6 @@
 #
-# This is the server logic of a Shiny web application. You can run the
+# This is the server logic of a dWaSSI model's web application. You can run the
 # application by clicking 'Run App' above.
-#
-# Find out more about building applications with Shiny here:
-#
-#    http://shiny.rstudio.com/
 #
 
 library(shiny)
@@ -42,7 +38,7 @@ theme_ning<-function(size.axis=5,size.title=6){
 #          "trend","gmodels","vcd","abind","Evapotranspiration","chron",
 #          "xts","dplyr","hydroGOF")
 
-librs<-c("dplyr","raster","ggplot2","leaflet","rgdal","rgeos")
+librs<-c("dplyr","raster","ggplot2","leaflet","rgdal","rgeos","leaflet.extras")
 f_lib_check(librs)
 
 # # load revised "hydromad" package
@@ -53,26 +49,53 @@ f_lib_check(librs)
 # Define server logic required to draw a histogram
 shinyServer(function(input, output,session) {
   options(shiny.maxRequestSize=30*1024^2)
-  # Tab: Upload data----
-  # Sidepanel: upload session ----
-  ## file2plot: Select a uploaded file for plotting----
-  observe({
-    x <- "test.csv"
-    if(!is.null(input$files$name)) x<-input$files$name
 
-    # Can also set the label and select items
-    updateSelectInput(session, "file2plot",
-                      label = paste("Select input label", length(x)),
-                      choices = x,
-                      selected = tail(x, 1)
-    )
+  # Define the info printing
+  inforprint<-reactiveValues(reading=NULL,
+                            processing="Data process log:",
+                            plotting=NULL)
+  f_addinfo<-function(tab,content=NULL){
+    inforprint[[tab]]<<-paste(inforprint[[tab]],content,sep="\n")
+  }
+
+  # Tab: Upload data----
+  ## Action: Print reading infor ----
+  output$printreadinginfo<-renderPrint({
+    if(!is.null(inforprint$reading)) print(inforprint$reading)
+  })
+  if (!exists("data_input")) data_input<-list()
+  ## Action: Print the uploaded file names ----
+  observeEvent(input$readdata,{
+
+    print(input$Input_climate)
+    inforprint$reading<-"Reading input data ..."
+    if (!is.null(input$Input_climate)) data_input[["Climate"]]<<-read.csv(input$Input_climate$datapath)
+    if (!is.null(input$Input_LAI)) data_input[["LAI"]]<<-read.csv(input$Input_LAI$datapath)
+    if (!is.null(input$Input_cellinfo)) data_input[["Cellinfo"]]<<-read.csv(input$Input_cellinfo$datapath)
+    if (!is.null(input$Input_Soilinfo)) data_input[["Soilinfo"]]<<-read.csv(input$Input_Soilinfo$datapath)
+    inforprint$reading<-"Finished reading all the input data ..."
+    output$printsummary<-renderPrint({
+      for (i in 1:length(data_input)){
+        var<-names(data_input)[i]
+        df<-data_input[[i]]
+        print(paste0(var," data----"))
+        print(head(df))
+        print(summary(df))
+      }
+    })
   })
 
+  # Tab: Process data----
 
-  ## Read Basin shapefile ----
-  BasinShp<-NULL
+  ## Print: Print the processig infor ----
+  output$printprocessinginfo<-renderPrint({
+    if(!is.null(inforprint$processing)) writeLines(inforprint$processing)
+  })
+
+  ## Action: Read Basin shapefile ----
+  if (!exists("BasinShp")) BasinShp<-NULL
   observeEvent(input$Input_basin,{
-    infoprt$info<-paste0(infoprt$info,"Reading shapfile ...")
+    f_addinfo("processing","Reading shapfile ...")
     Basins<- readOGR(input$Input_basin$datapath)
     Basins$BasinID<-c(1:length(Basins[,1]))
 
@@ -99,46 +122,26 @@ shinyServer(function(input, output,session) {
 
     }
     BasinShp<<-Basins
+    f_addinfo("processing","Finished processing the uploaded shapefile.")
   })
 
 
-  ## Plot Basin ----
-  observeEvent(input$plotbasin,{
-
-  # Plot the BasinShp
-  output$basinmap <- renderLeaflet({
-    if(is.null(BasinShp)) return()
-    leaflet()  %>% addTiles() %>%
-      #setView(lng = llong, lat=llat,zoom=13) %>%
-      addPolygons(data=BasinShp,weight=1,col = 'black',fillOpacity = 0.2,
-                  highlight = highlightOptions(color='white',weight=1,
-                                               bringToFront = TRUE))%>%
-      addMarkers(lng = BasinShp$Longitude, lat = BasinShp$Latitude,
-                 popup = as.character(BasinShp$BasinID),label = paste0("BasinID = ",BasinShp$BasinID))
-  })
-})
-
-  ## Read raster data  ----
-  input_rasters<-list()
-
-  infoprt<-reactiveValues(info=NULL)
-
-  output$prntinfo<-renderPrint({
-    if(!is.null(infoprt$info)) print(infoprt$info)
-  })
-
+  ## Action: Read raster data  ----
+  if (!exists("input_rasters")) input_rasters<-list()
   if (!exists("data_input")) data_input<-list()
 
   observeEvent(input$processrasters,{
-    if (is.null(input$Input_temp_raster) | is.null(BasinShp)) {
-      print("not inputs")
-      return("data is missing!")
 
+    if (is.null(BasinShp)) {
+      f_addinfo("processing","You need to upload a shapefile including the basins.")
+      return()
+    }
+
+    # process Climate input
+    if(is.null(input$Input_temp_raster)| is.null(input$Input_precp_raster)){
+      f_addinfo("processing","Warning: You need to provide the climate raster time series!")
     }else{
-
-      # process Climate input
-      infoprt$info<-paste(infoprt$info,"processing Climate data ...",sep="\n")
-      print(paste0("processing Climate data ..."))
+      f_addinfo("processing","Processing climate data ...")
       Tmean_catchment<-f_sta_shp_nc(input$Input_temp_raster$datapath,BasinShp,varname = "Tavg_C",start = 2000,zonal_field = "BasinID")
       Pre_catchment<-f_sta_shp_nc(input$Input_precp_raster$datapath,BasinShp,varname = "Ppt_mm",start = 2000,zonal_field = "BasinID")
       climate<-Pre_catchment%>%
@@ -146,21 +149,30 @@ shinyServer(function(input, output,session) {
         arrange(BasinID,Year,Month)%>%
         mutate(Ppt_mm=round(Ppt_mm,2))%>%
         mutate(Tavg_C=round(Tavg_C,2))%>%
-        select(BasinID,Year,Month,Ppt_mm,Tavg_C)
+        dplyr::select(BasinID,Year,Month,Ppt_mm,Tavg_C)
       data_input[["Climate"]]<<-climate
+      f_addinfo("processing","Finished processing climate input!")
+      print(paste0("Finished processsing Climate data ..."))
       #print(summary(climate))
+    }
 
-      # Process cellinfo
-      infoprt$info<-paste(infoprt$info,"processing Cellinfo data ...",sep="\n")
+    # Process cellinfo
+    if(is.null(input$Input_lc_raster)){
+      f_addinfo("processing","Warning: There is no land cover input!")
+    }else{
+      f_addinfo("processing","processing Cellinfo data ...")
       print(paste0("processing Cellinfo ..."))
       cellinfo<-f_cellinfo(classfname=input$Input_lc_raster$datapath,
                            Basins=BasinShp,
                            byfield="BasinID",
                            demfname=input$Input_dem_raster$datapath)
       data_input[["Cellinfo"]]<<-cellinfo
-
+      f_addinfo("processing","Finished processing cellinfo!")
+    }
       # process LAI input
-      print(paste0("processing LAI ..."))
+    if(is.null(input$Input_lc_raster) | is.null(input$Input_lai_raster) ){
+      f_addinfo("processing","Warning: There is no land cover or LAI data!")
+    }else{
       laiinfo<-f_landlai(lcfname=input$Input_lc_raster$datapath,
                           laifname=input$Input_lai_raster$datapath,
                           Basins=BasinShp,
@@ -168,13 +180,18 @@ shinyServer(function(input, output,session) {
                           yr.start=1982,
                           yr.end=2014)
       data_input[["LAI"]]<<-laiinfo
-
+      f_addinfo("processing","Finished processing Lai data!")
+    }
       # process SOIL input
-      print(paste0("processing Soilinfo ..."))
+    if(is.null(input$Input_soil_raster) | is.null(input$Input_lai_raster) ){
+      f_addinfo("processing","Warning: There is no soil data!")
+    }else{
       soilinfo<-f_soilinfo(soilfname=input$Input_soil_raster$datapath,
                           Basins=BasinShp)
       data_input[["Soilinfo"]]<<-soilinfo
-
+      f_addinfo("processing","Finished processing Soil data!")
+    }
+    # Print the summary of the input
       output$prntraster<-renderPrint({
         for (i in 1:length(data_input)){
           var<-names(data_input)[i]
@@ -184,118 +201,103 @@ shinyServer(function(input, output,session) {
           print(summary(df))
         }
       })
-    }
   })
 
 
-  ## Plot raster data  ----
+  ## PlotAction: Plot Basin and raster data  ----
       observeEvent(input$plotrasterdata,{
-        if (is.null(input$Input_temp_raster) | is.null(BasinShp)) {
-          print("not inputs")
-          return("data is missing!")
-        }else{
-      # Plot the BasinShp
+
+        if(!is.null(input$Input_temp_raster$datapath)){
+          f_addinfo("processing","Calculate average for temperature time series!")
+          Tmean_br<-brick(input$Input_temp_raster$datapath)
+          beginCluster()
+          Tmean_avg <<- clusterR(Tmean_br, calc, args=list(fun=mean,na.rm=T))
+          endCluster()
+          }
+        if(!is.null(input$Input_precp_raster$datapath)){
+          Pre_br<-brick(input$Input_precp_raster$datapath)
+          beginCluster()
+          Pre_br <- clusterR(Pre_br, calc, args=list(fun=mean,na.rm=T))
+          Pre_avg<<-Pre_br*12
+          endCluster()
+        }
+
       output$basinrastermap <- renderLeaflet({
+        # Plot the BasinShp
+        input_leaflet<-leaflet() %>%
+            addTiles(group = "OSM (default)") %>%
+            addProviderTiles('Esri.WorldImagery',group = "Esri.Imagery")%>%
+            addFullscreenControl()
+        grps<-c("OSM (default)", "Esri.Imagery")
+        ovlgrps<-NULL
 
-        if(is.null(BasinShp)|is.null(input$Input_temp_raster$datapath)) return()
-        dem<-raster(input$Input_dem_raster$datapath)
-        Tmean_br<-brick(input$Input_temp_raster$datapath)
-        beginCluster()
-        Tmean_br <- clusterR(Tmean_br, calc, args=list(fun=mean,na.rm=T))
-        endCluster()
-        Pre_br<-brick(input$Input_precp_raster$datapath)
-        beginCluster()
-        Pre_br <- clusterR(Pre_br, calc, args=list(fun=mean,na.rm=T))
-        Pre_br<-Pre_br*12
-        endCluster()
-        pal_tmp <- colorNumeric(c("cyan", "yellow", "red"), values(Tmean_br),
+        if (!is.null(BasinShp)) {
+          ovlgrps<-c(ovlgrps,"Watershed")
+          input_leaflet<-input_leaflet%>%
+            addPolygons(data=BasinShp,weight=1,col = 'red',fillOpacity = 0.2,
+                        highlight = highlightOptions(color='white',weight=1,
+                                                     bringToFront = TRUE),
+                        group = "Watershed")%>%
+            addMarkers(lng = BasinShp$Longitude, lat = BasinShp$Latitude,
+                       popup = as.character(BasinShp$BasinID),
+                       label = paste0("BasinID = ",BasinShp$BasinID))
+        }
+
+        if(!is.null(input$Input_temp_raster$datapath)){
+          ovlgrps<-c(ovlgrps,"Temperature")
+          pal_tmp <- colorNumeric(c("cyan", "yellow", "red"), values(Tmean_avg),
                             na.color = "transparent")
-        pal_prcp <- colorNumeric(c("azure", "cornflowerblue","darkblue"), values(Pre_br),
+          print(Tmean_avg)
+          input_leaflet<-input_leaflet%>%
+            addRasterImage(Tmean_avg, colors = pal_tmp, opacity = 0.8, group = "Temperature") %>%
+            addLegend("bottomleft",pal = pal_tmp, values = values(Tmean_avg),
+                      title = "Mean temp (°C)", group = "Temperature")
+        }
+
+        if(!is.null(input$Input_precp_raster$datapath)){
+          ovlgrps<-c(ovlgrps,"Precipitation")
+        pal_prcp <- colorNumeric(c("azure", "cornflowerblue","darkblue"), values(Pre_avg),
                                 na.color = "transparent")
-        pal_dem <- colorNumeric(c("green","yellow","red"), values(dem),
-                                 na.color = "transparent")
-        leaflet()  %>% addTiles(group = "OSM (default)") %>%
-          #setView(lng = llong, lat=llat,zoom=13) %>%
-          addProviderTiles('Esri.WorldImagery',group = "Esri.Imagery")%>%
-          addPolygons(data=BasinShp,weight=1,col = 'red',fillOpacity = 0.2,
-                      highlight = highlightOptions(color='white',weight=1,
-                                                   bringToFront = TRUE),
-                      group = "Watershed")%>%
-          addFullscreenControl()%>%
-          addRasterImage(Tmean_br, colors = pal_tmp, opacity = 0.8, group = "Temperature") %>%
-          addLegend("bottomleft",pal = pal_tmp, values = values(Tmean_br),
-                    title = "Mean temp (°C)", group = "Temperature")%>%
-          addRasterImage(Pre_br, colors = pal_prcp, opacity = 0.8, group = "Precipitation") %>%
-          addLegend("bottomleft",pal = pal_prcp, values = values(Pre_br),
-                    title = "Annual precipation (mm/yr)", group = "Precipitation")%>%
-          addRasterImage(dem, colors = pal_dem, opacity = 0.8, group = "Elevation") %>%
-          addLegend("bottomleft",pal = pal_dem, values = values(dem),
-                    title = "Elevation (m)", group = "Elevation")%>%
-          addMarkers(lng = BasinShp$Longitude, lat = BasinShp$Latitude,
-                     popup = as.character(BasinShp$BasinID),label = paste0("BasinID = ",BasinShp$BasinID))%>%
-          # Layers control
+        input_leaflet<-input_leaflet%>%
+          addRasterImage(Pre_avg, colors = pal_prcp, opacity = 0.8, group = "Precipitation") %>%
+          addLegend("bottomleft",pal = pal_prcp, values = values(Pre_avg),
+                    title = "Annual precipation (mm/yr)", group = "Precipitation")
+        }
+
+        if(!is.null(input$Input_dem_raster$datapath)){
+          ovlgrps<-c(ovlgrps,"Elevation")
+          dem<-raster(input$Input_dem_raster$datapath)
+          pal_dem <- colorNumeric(c("green","yellow","red"), values(dem),
+                                  na.color = "transparent")
+
+          input_leaflet<-input_leaflet%>%
+            addRasterImage(dem, colors = pal_dem, opacity = 0.8, group = "Elevation") %>%
+            addLegend("bottomleft",pal = pal_dem, values = values(dem),
+                    title = "Elevation (m)", group = "Elevation")
+        }
+
+        # Layers control
+        input_leaflet %>%
           addLayersControl(
-            baseGroups = c("OSM (default)", "Esri.Imagery","Elevation"),
-            overlayGroups = c("Watershed", "Temperature","Precipitation"),
+            baseGroups = grps,
+            overlayGroups = ovlgrps,
             options = layersControlOptions(collapsed = FALSE)
-          )
+          )%>%
+          clearGroup("Elevation")
+
       })
-      # input_rasters[["Precp"]]<<-brick(input$Input_precp_raster$datapath)
-      # input_rasters[["Lai"]]<<-brick(input$Input_lai_raster$datapath)
-      # input_rasters[["Imp"]]<<-raster(input$Input_imp_raster$datapath)
-      # input_rasters[["Lc"]]<<-raster(input$Input_lc_raster$datapath)
-      # input_rasters[["Soil"]]<<-brick(input$Input_Soil_raster$datapath)
-
-    }
 
   })
 
-  ## Plot Input raster files and shp ----
-  observeEvent(input$plotbasin,{
-
-    # Plot the BasinShp
-    output$basinmap <- renderLeaflet({
-      if(is.null(BasinShp)) return()
-      leaflet()  %>% addTiles() %>%
-        #setView(lng = llong, lat=llat,zoom=13) %>%
-        addPolygons(data=BasinShp,weight=1,col = 'black',fillOpacity = 0.2,
-                    highlight = highlightOptions(color='white',weight=1,
-                                                 bringToFront = TRUE))%>%
-        addMarkers(lng = BasinShp$Longitude, lat = BasinShp$Latitude,
-                   popup = as.character(BasinShp$BasinID),label = paste0("BasinID = ",BasinShp$BasinID))
-    })
-  })
-
-  if (!exists("data_input")) data_input<-list()
-  ## Action: Print the uploaded file names ----
-  observeEvent(input$readdata,{
-
-                print(input$Input_climate)
-                if (!is.null(input$Input_climate)) data_input[["Climate"]]<<-read.csv(input$Input_climate$datapath)
-                if (!is.null(input$Input_LAI)) data_input[["LAI"]]<<-read.csv(input$Input_LAI$datapath)
-                if (!is.null(input$Input_cellinfo)) data_input[["Cellinfo"]]<<-read.csv(input$Input_cellinfo$datapath)
-                if (!is.null(input$Input_Soilinfo)) data_input[["Soilinfo"]]<<-read.csv(input$Input_Soilinfo$datapath)
-
-                output$printsummary<-renderPrint({
-                 for (i in 1:length(data_input)){
-                   var<-names(data_input)[i]
-                   df<-data_input[[i]]
-                   print(paste0(var," data----"))
-                   print(head(df))
-                   print(summary(df))
-                  }
-                })
-           })
-
-
-  ## output$distPlot: Plot the select dataset ----
+  # Tab: Plot input data----
+  ## Plot: Plot selected input data ----
   output$Plotinput <- renderPlot({
 
     if(input$plotdata>0){
       print(paste0("Print data ....",input$daname2plot))
-      infoprt$info<-paste0("Print data ....",input$daname2plot)
+      inforprint$info<-paste0("Print data ....",input$daname2plot)
       if(!input$daname2plot %in% names(data_input)) {
-        infoprt$info<-"no data"
+        inforprint$info<-"no data"
         return()}
       df<-data_input[[input$daname2plot]]%>%
           filter(Year>=input$plotyrrange[1] & Year<=input$plotyrrange[2])%>%
@@ -303,7 +305,7 @@ shinyServer(function(input, output,session) {
           mutate(Date=as.Date(paste0(Year,"-",Month,"-","01")))%>%
           dplyr::select(-Year,-Month)
       if(nrow(df)<1) {
-        infoprt$info<-"no data"
+        inforprint$info<-"no data"
         return()}
 
       if(input$daname2plot == "Climate"){
