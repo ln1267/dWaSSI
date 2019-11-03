@@ -301,12 +301,13 @@ shinyServer(function(input, output,session) {
         basinids<-as.integer(strsplit(input$plotBasinID,",")[[1]])
         if(sum(basinids %in% data_input[[input$daname2plot]]$BasinID)<1) {
 
-          f_addinfo("plotting",paste0("It doesn't have this BasinID: ",basinids))
+          f_addinfo("plotting",paste0("It doesn't have this BasinID: ",paste(basinids,collapse=",")))
           return()
         }
+        f_addinfo("plotting",paste0("Print data for BasinID: ",paste(basinids,collapse=",")))
         df<-data_input[[input$daname2plot]]%>%
             filter(BasinID %in% basinids)%>%
-            mutate(BasinID=factor(BasinID))%>%
+            mutate(BasinID=factor(paste0("BasinID = ",BasinID)))%>%
             filter(Year>=input$plotyrrange[1] & Year<=input$plotyrrange[2])%>%
             filter(Month %in% input$plotmonths)%>%
             mutate(Date=as.Date(paste0(Year,"-",Month,"-","01")))
