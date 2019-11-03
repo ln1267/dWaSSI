@@ -222,6 +222,13 @@ shinyServer(function(input, output,session) {
           endCluster()
         }
 
+        if(!is.null(input$Input_lai_raster$datapath)){
+          Lai_br<-brick(input$Input_lai_raster$datapath)
+          beginCluster()
+          Lai_avg <<- clusterR(Lai_br, calc, args=list(fun=mean,na.rm=T))
+          endCluster()
+        }
+
       output$basinrastermap <- renderLeaflet({
         # Plot the BasinShp
         input_leaflet<-leaflet() %>%
@@ -276,14 +283,36 @@ shinyServer(function(input, output,session) {
                     title = "Elevation (m)", group = "Elevation")
         }
 
+        if(!is.null(input$Input_lai_raster$datapath)){
+          ovlgrps<-c(ovlgrps,"LAI")
+          pal_lai <- colorNumeric(c("red","yellow","green"), values(Lai_avg),
+                                  na.color = "transparent")
+
+          input_leaflet<-input_leaflet%>%
+            addRasterImage(Lai_avg, colors = pal_lai, opacity = 0.8, group = "LAI") %>%
+            addLegend("bottomleft",pal = pal_lai, values = values(Lai_avg),
+                      title = "Leaf area index (m2/m2)", group = "LAI")
+        }
+
+        if(!is.null(input$Input_lc_raster$datapath)){
+          lc<-raster(input$Input_lc_raster$datapath)
+          ovlgrps<-c(ovlgrps,"Land cover")
+          pal_lc <- colorFactor("RdYlBu", levels = values(lc),values(lc),
+                                  na.color = "transparent")
+
+          input_leaflet<-input_leaflet%>%
+            addRasterImage(lc, colors = pal_lc, opacity = 0.8, group = "Land cover") %>%
+            addLegend("bottomleft",pal = pal_lc, values =  values(lc),
+                      title = "Land cover",group = "Land cover")
+        }
+
         # Layers control
         input_leaflet %>%
           addLayersControl(
             baseGroups = grps,
             overlayGroups = ovlgrps,
             options = layersControlOptions(collapsed = FALSE)
-          )%>%
-          clearGroup("Elevation")
+          )
 
       })
 
