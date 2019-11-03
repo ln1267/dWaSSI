@@ -3,12 +3,45 @@
 Ning<-"Ning Liu"
 testfile<-"tmp/test.csv"
 # Load all libraries----
-library("dplyr")
-library("plyr")
-library("zoo")
+# library("dplyr")
+# library("plyr")
+# library("zoo")
 # library("hydromad")
 # library("hydroGOF")
-library("xts")
+#library("xts")
+# function for checking libs
+f_lib_check<-function(libs){
+  for (lib in libs ){
+    if(lib %in% rownames(installed.packages())){
+
+    }else{
+      install.packages(lib,repos='http://cran.us.r-project.org')
+    }
+  }
+
+  a<-lapply(libs, require, character.only = TRUE)
+}
+theme_ning<-function(size.axis=5,size.title=6){
+  theme_bw(base_family = "serif") %+replace%
+    theme(axis.title = element_text(face="bold", colour="black", size=size.title),
+          axis.text= element_text(angle=0, vjust=0.3, size=size.axis),
+          legend.title = element_text(colour="black", size=size.axis, face="bold"),
+          legend.text = element_text(colour="black", size = size.axis),
+          strip.text.x = element_text(size = size.axis,margin=margin(4, 2, 6, 2), face="bold"),
+          strip.text.y = element_text(size = size.axis,margin=margin(4, 2, 4, 6), face="bold",angle=-90),
+          legend.key.size=unit(1.2, "lines"),
+          legend.box.spacing=unit(1, "mm"),
+          strip.background = element_blank(),
+          plot.title = element_text(vjust = 2.5,hjust = 0.5,face="bold")
+    )
+}
+# librs<-c("plyr","bfast","ggplot2","ggrepel","reshape2","pryr","ncdf4",
+#          "caTools","graphics","parallel","zoo","RColorBrewer",
+#          "trend","gmodels","vcd","abind","Evapotranspiration","chron",
+#          "xts","dplyr","hydroGOF")
+
+librs<-c("dplyr","raster","ggplot2","leaflet","rgdal","rgeos","leaflet.extras","parallel")
+f_lib_check(librs)
 
 uploadfilenames<-"test.csv"
 
@@ -142,7 +175,7 @@ numberOfDays<-function(date) {
 
 daily2monthly<-function (x, FUN, na.rm = TRUE, ...)
 {
-  library(xts)
+  #library(xts)
   library(zoo)
   if (missing(FUN))
     stop("Missing argument value: 'FUN' must contain a valid function for aggregating the values")
