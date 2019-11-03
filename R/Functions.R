@@ -973,7 +973,7 @@ f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,start,sca
         mutate(Year=as.integer(format(dates,"%Y")),
                Month=as.integer(format(dates,"%m")),
                BasinID=rep(basin[[zonal_field]],each=length(dates)))%>%
-        select(BasinID,Year,Month,values)
+        dplyr::select(BasinID,Year,Month,values)
       names(sta_catchment)<-c(zonal_field,"Year","Month",varname)
 
     }else if(scale=="annual" | scale=="Annual" | scale=="ANNUAL"){
@@ -981,7 +981,7 @@ f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,start,sca
       sta_catchment<-sta_catchment%>%
         mutate(Year=as.integer(format(dates,"%Y")),
                BasinID=rep(basin[[zonal_field]],each=length(dates)))%>%
-        select(BasinID,Year,values)
+        dplyr::select(BasinID,Year,values)
       names(sta_catchment)<-c(zonal_field,"Year",varname)
 
     }else{
@@ -992,7 +992,7 @@ f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,start,sca
                Month=as.integer(format(dates,"%m")),
                Day=as.integer(format(dates,"%d")),
                BasinID=rep(basin[[zonal_field]],each=length(dates)))%>%
-        select(BasinID,Year,Month,Day,values)
+        dplyr::select(BasinID,Year,Month,Day,values)
       names(sta_catchment)<-c(zonal_field,"Year","Month","Day",varname)
 
     }
