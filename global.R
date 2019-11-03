@@ -34,7 +34,9 @@ f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,start,sca
   require(dplyr)
   require(raster)
   require(tidyr)
+  require(sp)
   da<-brick(ncfilename)
+  basin<-spTransform(basin,crs(da))
   da<-crop(da,basin)
   #NAvalue(da)<- 0
   if(plot) {
@@ -92,18 +94,23 @@ f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,start,sca
 # this function is used for zonal LAI of each HRU in by a shp file
 hru_lc_zonal<-function(classname,daname,shp,fun='mean',field=NULL,plot=T){
   require(raster)
+  require(sp)
   # read the class and data by their names
   class<-raster(classname)
   da<-brick(daname)
 
   # crop data based on the input shp
-  class<-crop(class,shp)
+  shp<-spTransform(shp,crs(da))
   da<-crop(da,shp)
 
+  shp<-spTransform(shp,crs(class))
+  class<-crop(class,shp)
+
   # resample class data based on the input data (Their geo reference could be different)
-  class<-resample(class,da[[1]],method='ngb')
-  class<-raster::mask(class,shp)
-  da<-raster::mask(da,shp)
+  #class<-projectRaster(class,da[[1]],method='ngb')
+  #da<-projectRaster(da,class,method='ngb')
+  # class<-raster::mask(class,shp)
+  # da<-raster::mask(da,shp)
 
   shp@data[,field]<-as.character(shp@data[,field])
 
@@ -119,15 +126,35 @@ hru_lc_zonal<-function(classname,daname,shp,fun='mean',field=NULL,plot=T){
 
   # funtion for zonal each polygon
   f_zonal<-function(i){
+    print(i)
     polygon1<-shp[i,]
     class1<-crop(class,polygon1)
+    polygon1<-spTransform(polygon1,crs(da))
     da1<-crop(da,polygon1)
+    polygon1<-spTransform(polygon1,crs(class1))
+    da1<-projectRaster(da1,class1,method='ngb')
     class1<-raster::mask(class1,polygon1)
     da1<-raster::mask(da1,polygon1)
+    if(sum(unique(class1))<1){
+      da_zonal1<-NA
+      return(da_zonal1)
+    }else if(ncell(class1)==1){
+      da_zonal1<-data.frame("lai"=values(da1)[1,])
+      colnames(da_zonal1)<-paste0("Lc_",unique(class1))
+      return(da_zonal1)
+    }
     da_zonal1<-zonal(da1, class1, fun)
-    namesls<-paste0("Lc_",da_zonal1[,1])
-    da_zonal1<-t(da_zonal1[,-1])
-    colnames(da_zonal1)<-namesls
+
+    if(nrow(da_zonal1)<2){
+      namesls<-paste0("Lc_",da_zonal1[,1])
+      da_zonal1<-data.frame(namesls=da_zonal1[1,-1])
+      colnames(da_zonal1)<-namesls
+    }else{
+      namesls<-paste0("Lc_",da_zonal1[,1])
+      da_zonal1<-t(da_zonal1[,-1])
+      colnames(da_zonal1)<-namesls
+    }
+
     return(da_zonal1)
   }
 
@@ -147,7 +174,10 @@ hru_lc_zonal<-function(classname,daname,shp,fun='mean',field=NULL,plot=T){
 
 hru_lc_ratio<-function(classname,shp,field=NULL,mcores=1){
   library(raster)
+  require(sp)
+
   class<-raster(classname)
+  shp<-spTransform(shp,crs(class))
   class<-crop(class,shp)
   class<-mask(class,shp)
   print(table(matrix(class)))
@@ -240,7 +270,7 @@ f_cellinfo<-function(classfname,Basins,byfield="BasinID",demfname=NULL){
 }
 f_soilinfo<-function(soilfname,Basins){
   SOIL<-brick(soilfname)
-
+  Basins<-spTransform(Basins,crs(SOIL))
   SOIL_catchment<-raster::extract(SOIL,Basins,fun=mean,na.rm=T,weights=T)
   # fill NA values
   SOIL_catchment[is.infinite(SOIL_catchment)]<-NA
@@ -252,6 +282,14 @@ f_soilinfo<-function(soilfname,Basins){
 
   SOIL_catchment<-cbind(BasinID=Basins$BasinID,SOIL_catchment)
   return(SOIL_catchment)
+}
+
+f_crop_roi<-function(da,roi_shp,plot=T){
+  roi_shp<-spTransform(roi_shp,crs(da))
+  da<-crop(da,roi_shp)
+  da<-mask(da,roi_shp)
+  if(plot) plot(da[[1]]);plot(roi_shp,add=T)
+  return(da)
 }
 
 multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {

@@ -63,7 +63,7 @@ shinyServer(function(input, output,session) {
     if(!"Latitude"  %in% names(Basins)) {
 
       # get the contral coordinates of each polygon
-     if(is.na(Basins)) proj4string(Basins)<-CRS("+init=epsg:4326")
+     if(is.na(crs(Basins))) proj4string(Basins)<-CRS("+init=epsg:4326")
       Basins_wgs<-spTransform(Basins,CRS("+init=epsg:4326"))
       Basin_coords<-gCentroid(Basins_wgs, byid=TRUE)
       rownames(Basin_coords@coords)<-Basins$BasinID
