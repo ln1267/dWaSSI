@@ -105,6 +105,7 @@ shinyUI(
                              choices=c("Climate","LAI")),
                  ## Input: Select a variable ----
                  textInput("plotvar", "Type the variable name for ploting","Ppt_mm"),
+                 textInput("plotBasinID", "Type the BasinID name for ploting","1"),
                  # Input: Year for plotting ---
                  sliderInput("plotyrrange", "Select the year range", 1970, 2017, value = c(2000, 2010)),
                  # Input: Month ----
@@ -119,7 +120,7 @@ shinyUI(
 
                  ## Output: Plot of the selected two columns----
                  h2("Please select two columns to plot the data"),
-                 verbatimTextOutput("prntplottinginfo"),
+                 verbatimTextOutput("printplottinginfo"),
                  verbatimTextOutput("distPloterror"),
 
                  plotOutput("Plotinput",height = 800)
@@ -167,7 +168,7 @@ shinyUI(
                    tags$hr(),
                    h2("Plot water and carbon processes"),
                   # Input: Result plot variables ----
-                  checkboxGroupInput("plotvars","Select the variables to plot",c(input_vars,result_vars[1:8]),inline = T),
+                  checkboxGroupInput("plotvars","Select the variables to plot",c("P","T","Q"),inline = T),
 
                   # Input: Year for plotting ---
                   sliderInput("plotdaterange", "Year plot", 1970, 2017, value = c(2000, 2010)),
