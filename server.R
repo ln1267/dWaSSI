@@ -293,7 +293,7 @@ shinyServer(function(input, output,session) {
           f_addinfo("plotting","It does have this data.")
           return()}
         plotvars<-strsplit(input$plotvar,",")[[1]]
-        if(sum(plotvars %in% names(data_input[[input$daname2plot]]))<1) {
+        if(input$daname2plot=="LAI" & sum(plotvars %in% names(data_input[[input$daname2plot]]))<1) {
 
           f_addinfo("plotting",paste0("You can select these variables: ",names(data_input[[input$daname2plot]])))
           return()
@@ -306,7 +306,7 @@ shinyServer(function(input, output,session) {
         }
         df<-data_input[[input$daname2plot]]%>%
             filter(BasinID %in% basinids)%>%
-            mutate(BasinID=factor(df$BasinID))%>%
+            mutate(BasinID=factor(BasinID))%>%
             filter(Year>=input$plotyrrange[1] & Year<=input$plotyrrange[2])%>%
             filter(Month %in% input$plotmonths)%>%
             mutate(Date=as.Date(paste0(Year,"-",Month,"-","01")))
