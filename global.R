@@ -1,7 +1,5 @@
 # This is the global Rscript for this app
 
-Ning<-"Ning Liu"
-
 # function for checking libs
 f_lib_check<-function(libs){
   for (lib in libs ){
@@ -427,4 +425,7 @@ hrurouting<-function(Flwdata,routpar,mc_cores=1){
 
 librs<-c("dplyr","raster","ggplot2","leaflet","rgdal","rgeos","leaflet.extras","parallel","shinyFiles")
 f_lib_check(librs)
+
+data_input<-list()
+Ning<-"Ning Liu"
 

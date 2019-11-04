@@ -12,7 +12,8 @@ shinyServer(function(input, output,session) {
   # Define the info printing
   inforprint<-reactiveValues(reading=NULL,
                             processing="Data process log:",
-                            plotting="Plotting log: ")
+                            plotting="Plotting log: ",
+                            simulating="Simulationg log: ")
   f_addinfo<-function(tab,content=NULL){
     inforprint[[tab]]<<-paste(inforprint[[tab]],content,sep="\n")
   }
@@ -25,8 +26,11 @@ shinyServer(function(input, output,session) {
   if (!exists("data_input")) data_input<-list()
   ## Action: Print the uploaded file names ----
   observeEvent(input$readdata,{
-
     print(input$Input_climate)
+    if(is.null(c(input$Input_climate,input$Input_LAI,input$Input_cellinfo,input$Input_Soilinfo))) {
+      inforprint$reading<-"!!! Warining: You need to select at least one file!"
+      return()
+    }
     inforprint$reading<-"Reading input data ..."
     if (!is.null(input$Input_climate)) data_input[["Climate"]]<<-read.csv(input$Input_climate$datapath)
     if (!is.null(input$Input_LAI)) data_input[["LAI"]]<<-read.csv(input$Input_LAI$datapath)
@@ -132,7 +136,7 @@ shinyServer(function(input, output,session) {
         dplyr::select(BasinID,Year,Month,Ppt_mm,Tavg_C)
       data_input[["Climate"]]<<-climate
       f_addinfo("processing","Finished processing climate input!")
-      print(paste0("Finished processsing Climate data ..."))
+      print("Finished processsing Climate data ...")
       #print(summary(climate))
     }
 
@@ -151,6 +155,7 @@ shinyServer(function(input, output,session) {
                            byfield="BasinID",
                            demfname=input$Input_dem_raster$datapath)
       data_input[["Cellinfo"]]<<-cellinfo
+      print("Finished processsing Cellinfo data ...")
       f_addinfo("processing","Finished processing cellinfo!")
     }
       # process LAI input
@@ -170,6 +175,7 @@ shinyServer(function(input, output,session) {
                           byfield="BasinID",
                           yr.start=input$yearStartLai)
       data_input[["LAI"]]<<-laiinfo
+      print("Finished processsing LAI data ...")
       f_addinfo("processing","Finished processing Lai data!")
     }
       # process SOIL input
@@ -184,6 +190,7 @@ shinyServer(function(input, output,session) {
       soilinfo<-f_soilinfo(soilfname=input$Input_soil_raster$datapath,
                           Basins=BasinShp)
       data_input[["Soilinfo"]]<<-soilinfo
+      print("Finished processsing LAI data ...")
       f_addinfo("processing","Finished processing Soil data!")
     }
     # Print the summary of the input
@@ -435,7 +442,7 @@ shinyServer(function(input, output,session) {
             ggplot(aes(x=Date,y=LAI,col=Lcs,shape=Lcs))+geom_line()+geom_point(size=2.5)+
             ggtitle(paste0("Monthly Leaf area index (m2/m2)"))+
             facet_wrap(BasinID~.,ncol=2)+
-            labs(col = "land cover",shape="land cover")+
+            labs(col = "Land cover",shape="Land cover")+
             scale_x_date(date_breaks = "1 year", date_labels = "%Y")+
             theme_ning(size.axis = 12,size.title = 14)
 
@@ -445,7 +452,55 @@ shinyServer(function(input, output,session) {
   })
   # Tab: simulation----
   # Sidepanel: ----
+  ## Action: Subset data by Station ID and period----
+  observeEvent(input$subdata, {
+    NoBasins<-length(BasinID_sel)
 
+    # process soilinfo
+    par_sacsma<-data_input[["Soilinfo"]]%>%
+      filter(BasinID %in% BasinID_sel)%>%
+      dplyr::select(-BasinID)%>%
+      as.matrix()
+    colnames(par_sacsma)<-toupper(colnames(par_sacsma))
+
+    # process climate data
+    clim_prcp<-data_input[["Climate"]]%>%
+      filter(BasinID %in% BasinID_sel)%>%
+      mutate(Date=as.Date(paste0(Year,"-",Month,"-","01")))%>%
+      filter(Date>=SimStart & Date<=SimEnd)%>%
+      dplyr::select(Ppt_mm)%>%
+      matrix(Climate$Tavg_C,ncol=NoBasins)
+    clim_tavg<-data_input[["Climate"]]%>%
+      filter(BasinID %in% BasinID_sel)%>%
+      mutate(Date=as.Date(paste0(Year,"-",Month,"-","01")))%>%
+      filter(Date>=SimStart & Date<=SimEnd)%>%
+      dplyr::select(Tavg_C)%>%
+      matrix(Climate$Tavg_C,ncol=NoBasins)
+
+
+    ## PET parameters
+    par_petHamon = rep(1,NoBasins)
+
+
+    ## Input LAI and ratio for each vegetation type
+    huc_lc_ratio<-data_input[["Cellinfo"]]%>%
+      filter(BasinID %in% BasinID_sel)%>%
+      dplyr::select(BasinID:Elev_m)%>%
+      as.matrix()
+    hru_lc_lai<-lapply(BasinID_sel, function(x) as.matrix(subset(data_input[["LAI"]],BasinID==x)[c(4:length(data_input[["LAI"]][1,]))]))
+
+    ## Hru info like Lat, long and elevation for each HUC
+    hru_info<-data_input[["Cellinfo"]]%>%
+      filter(BasinID %in% BasinID_sel)%>%
+      dplyr::select(one_of("BasinID","Latitude","Area_m2","Elev_m","FlwLen_m"))
+    if("Elev_m" %in% names(hru_info)) hru_info["Elev_m"]<-1000
+    if("FlwLen_m" %in% names(hru_info)) hru_info["FlwLen_m"]<-1000
+
+    output$subsetdata<-renderText({
+       print("Subseting data has started, please wait .....")
+       f_subset(input$StationID,input$subsetdaterange,input$uploadfilename)
+    })
+  })
   ## output$uploadfilename:Select a uploaded file for subsetting----
   output$uploadfilename <- renderUI({
     # If missing input, return to avoid error later in function
