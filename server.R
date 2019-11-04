@@ -46,6 +46,20 @@ shinyServer(function(input, output,session) {
 
   # Tab: Process data----
 
+# # Select file by name
+#   filepaths<-reactiveValues(laifname=NULL)
+#   volumes = getVolumes()
+#   observe({
+#     shinyFileChoose(input, "Input_lai_fpath", roots = volumes, session = session)
+#
+#     if(!is.null(input$Input_lai_fpath)){
+#       # browser()
+#       file_selected<-parseFilePaths(volumes, input$Input_lai_fpath)
+#       filepaths$laifname <- renderText(as.character(file_selected$datapath))
+#     }
+#   })
+
+#print(filepaths$laifname)
   ## Print: Print the processig infor ----
   output$printprocessinginfo<-renderPrint({
     if(!is.null(inforprint$processing)) writeLines(inforprint$processing)
@@ -140,15 +154,18 @@ shinyServer(function(input, output,session) {
       f_addinfo("processing","Finished processing cellinfo!")
     }
       # process LAI input
-    if(is.null(input$Input_lc_raster) | is.null(input$Input_lai_raster) ){
+    if(is.null(input$Input_lc_raster) | (is.null(input$Input_lai_raster) & input$Input_lai_fpath=="~" )){
       f_addinfo("processing","Warning: There is no land cover or LAI data!")
 
     }else if("LAI" %in% names(data_input)){
       f_addinfo("processing","Warning: LAI data has been processed!")
 
     }else{
+      print("Processing LAIinfo")
+      laifname<-input$Input_lai_fpath
+      if(laifname=="~")  laifname<-input$Input_lai_raster$datapath
       laiinfo<-f_landlai(lcfname=input$Input_lc_raster$datapath,
-                          laifname=input$Input_lai_raster$datapath,
+                          laifname=laifname,
                           Basins=BasinShp,
                           byfield="BasinID",
                           yr.start=input$yearStartLai)
@@ -163,7 +180,7 @@ shinyServer(function(input, output,session) {
       f_addinfo("processing","Warning: Soilinfo data has been processed!")
 
       }else{
-        print("Processing Soilinfo")
+      print("Processing Soilinfo")
       soilinfo<-f_soilinfo(soilfname=input$Input_soil_raster$datapath,
                           Basins=BasinShp)
       data_input[["Soilinfo"]]<<-soilinfo
@@ -186,25 +203,43 @@ shinyServer(function(input, output,session) {
   ## PlotAction: Plot Basin and raster data  ----
       observeEvent(input$plotrasterdata,{
 
+        Tmean_avg<-NULL
+        Pre_avg<-NULL
+        Lai_avg<-NULL
+        dem<-NULL
+
+        if(!is.null(input$Input_dem_raster$datapath)){
+          print("reading dem")
+          dem<-raster(input$Input_dem_raster$datapath)
+          f_addinfo("processing","Finished reading dem data!")
+        }
+        if(!is.null(input$Input_lc_raster$datapath)){
+          print("reading lc")
+          lc<-raster(input$Input_lc_raster$datapath)
+          f_addinfo("processing","Finished reading ladn cover data!")
+        }
         if(!is.null(input$Input_temp_raster$datapath)){
+          print("reading temperature data")
           f_addinfo("processing","Calculate average for temperature time series!")
           Tmean_br<-brick(input$Input_temp_raster$datapath)
           beginCluster()
-          Tmean_avg <<- clusterR(Tmean_br, calc, args=list(fun=mean,na.rm=T))
+          Tmean_avg <- clusterR(Tmean_br, calc, args=list(fun=mean,na.rm=T))
           endCluster()
           }
         if(!is.null(input$Input_precp_raster$datapath)){
+          print("reading precipitation data")
           Pre_br<-brick(input$Input_precp_raster$datapath)
           beginCluster()
           Pre_br <- clusterR(Pre_br, calc, args=list(fun=mean,na.rm=T))
-          Pre_avg<<-Pre_br*12
+          Pre_avg<-Pre_br*12
           endCluster()
         }
 
         if(!is.null(input$Input_lai_raster$datapath)){
+          print("reading LAI data")
           Lai_br<-brick(input$Input_lai_raster$datapath)
           beginCluster()
-          Lai_avg <<- clusterR(Lai_br, calc, args=list(fun=mean,na.rm=T))
+          Lai_avg <- clusterR(Lai_br, calc, args=list(fun=mean,na.rm=T))
           endCluster()
         }
 
@@ -212,6 +247,7 @@ shinyServer(function(input, output,session) {
       output$basinrastermap <- renderLeaflet({
         input$plotrasterdata
         # Plot the BasinShp
+        print("plotting basic map")
         input_leaflet<-leaflet() %>%
             addTiles(group = "OSM (default)") %>%
             addProviderTiles('Esri.WorldImagery',group = "Esri.Imagery")%>%
@@ -220,7 +256,7 @@ shinyServer(function(input, output,session) {
         ovlgrps<-NULL
 
         if (!is.null(BasinShp)) {
-
+          print("Add basin to basic map")
           popups<-paste0("BasinID = ",BasinShp$BasinID)
           if("Elev_m" %in% names(BasinShp)) popups<-f_paste(popups,paste0("; Elevatation = ",round(BasinShp$Elev_m,0),"m"))
 
@@ -237,7 +273,8 @@ shinyServer(function(input, output,session) {
 
         }
 
-        if(!is.null(input$Input_temp_raster$datapath)){
+        if(!is.null(Tmean_avg)){
+          print("Add temperature to basic map")
           ovlgrps<-c(ovlgrps,"Temperature")
           pal_tmp <- colorNumeric(c("cyan", "yellow", "red"), values(Tmean_avg),
                             na.color = "transparent")
@@ -248,7 +285,8 @@ shinyServer(function(input, output,session) {
                       title = "Mean temp (°C)", group = "Temperature")
         }
 
-        if(!is.null(input$Input_precp_raster$datapath)){
+        if(!is.null(Pre_avg)){
+          print("Add precipitation to basic map")
           ovlgrps<-c(ovlgrps,"Precipitation")
         pal_prcp <- colorNumeric(c("azure", "cornflowerblue","darkblue"), values(Pre_avg),
                                 na.color = "transparent")
@@ -258,9 +296,9 @@ shinyServer(function(input, output,session) {
                     title = "Annual precipation (mm/yr)", group = "Precipitation")
         }
 
-        if(!is.null(input$Input_dem_raster$datapath)){
+        if(!is.null(dem)){
+          print("Add dem to basic map")
           ovlgrps<-c(ovlgrps,"Elevation")
-          dem<-raster(input$Input_dem_raster$datapath)
           pal_dem <- colorNumeric(c("green","yellow","red"), values(dem),
                                   na.color = "transparent")
 
@@ -270,7 +308,8 @@ shinyServer(function(input, output,session) {
                     title = "Elevation (m)", group = "Elevation")
         }
 
-        if(!is.null(input$Input_lai_raster$datapath)){
+        if(!is.null(Lai_avg)){
+          print("Add lai to basic map")
           ovlgrps<-c(ovlgrps,"LAI")
           pal_lai <- colorNumeric(c("red","yellow","green"), values(Lai_avg),
                                   na.color = "transparent")
@@ -281,8 +320,8 @@ shinyServer(function(input, output,session) {
                       title = "Leaf area index (m2/m2)", group = "LAI")
         }
 
-        if(!is.null(input$Input_lc_raster$datapath)){
-          lc<-raster(input$Input_lc_raster$datapath)
+        if(!is.null(lc)){
+          print("Add land cover to basic map")
           ovlgrps<-c(ovlgrps,"Land cover")
           pal_lc <- colorFactor("RdYlBu", levels = values(lc),values(lc),
                                   na.color = "transparent")
