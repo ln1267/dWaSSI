@@ -306,14 +306,19 @@ shinyServer(function(input, output,session) {
   ## Plot: Plot selected input data ----
   observeEvent(input$plotdata,{
         inforprint$plotting<-"Plotting log: "
+
         data2plot<-input$daname2plot
+        basinids<-as.integer(strsplit(input$plotBasinID,",")[[1]])
+        plotvars<-strsplit(input$plotvar,",")[[1]]
+        yr.start<-input$plotyrrange[1]; yr.end<-input$plotyrrange[2]
+        plotmonths<-input$plotmonths
+
         print(paste0("Print data ....",data2plot))
         f_addinfo("plotting",paste0("Printing ",data2plot," data ..."))
         if(!data2plot %in% names(data_input)) {
           f_addinfo("plotting","It does have this data.")
           return()}
-        plotvars<-strsplit(input$plotvar,",")[[1]]
-        basinids<-as.integer(strsplit(input$plotBasinID,",")[[1]])
+
         if(sum(basinids %in% data_input[[data2plot]]$BasinID)<1) {
 
           f_addinfo("plotting",paste0("!!! Warning: No BasinID: ",paste(basinids,collapse=",")))
@@ -323,12 +328,16 @@ shinyServer(function(input, output,session) {
         df<-data_input[[data2plot]]%>%
             filter(BasinID %in% basinids)%>%
             mutate(BasinID=factor(paste0("BasinID = ",BasinID)))%>%
-            filter(Year>=input$plotyrrange[1] & Year<=input$plotyrrange[2])%>%
-            filter(Month %in% input$plotmonths)%>%
-            mutate(Date=as.Date(paste0(Year,"-",Month,"-","01")))
+            filter(Year>=yr.start & Year<=yr.end)%>%
+            filter(Month %in% plotmonths)
         if(nrow(df)<1) {
-          f_addinfo("plotting","!!! Warning: No data!")
-          return()}
+          f_addinfo("plotting","!!! Warning: No data in this time period!")
+          f_addinfo("plotting",paste0("You can plot priod of ",paste(range(data_input[[data2plot]]$Year),collapse = " - ")))
+          return()
+          }else{
+          df<-df%>%
+              mutate(Date=as.Date(paste0(Year,"-",Month,"-","01")))
+          }
 
         # test for LAI data
         if(data2plot=="LAI" & sum(plotvars %in% names(data_input[[data2plot]]))<1) {
