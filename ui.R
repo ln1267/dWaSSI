@@ -86,13 +86,14 @@ shinyUI(
                  # leafletOutput("basinmap"),
 
 
-                 h2("Plot mean climate data"),
+                 h2("Plot an interactice map and print summary of processed input."),
                  HTML("<p>It will take a while for the data process. Please wait ...</p>
                       "),
+                 leafletOutput("basinrastermap"),
                  verbatimTextOutput("printprocessinginfo"),
-                 verbatimTextOutput("prntraster"),
+                 verbatimTextOutput("prntraster")
 
-                 leafletOutput("basinrastermap")
+
                )
              )
     ),

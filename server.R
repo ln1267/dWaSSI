@@ -208,6 +208,7 @@ shinyServer(function(input, output,session) {
           endCluster()
         }
 
+
       output$basinrastermap <- renderLeaflet({
         # Plot the BasinShp
         input_leaflet<-leaflet() %>%
@@ -218,6 +219,10 @@ shinyServer(function(input, output,session) {
         ovlgrps<-NULL
 
         if (!is.null(BasinShp)) {
+
+          popups<-paste0("BasinID = ",BasinShp$BasinID)
+          if("Elev_m" %in% names(BasinShp)) popups<-f_paste(popups,paste0("; Elevatation = ",round(BasinShp$Elev_m,0),"m"))
+
           ovlgrps<-c(ovlgrps,"Watershed")
           input_leaflet<-input_leaflet%>%
             addPolygons(data=BasinShp,weight=1,col = 'red',fillOpacity = 0.2,
@@ -225,8 +230,10 @@ shinyServer(function(input, output,session) {
                                                      bringToFront = TRUE),
                         group = "Watershed")%>%
             addMarkers(lng = BasinShp$Longitude, lat = BasinShp$Latitude,
-                       popup = as.character(BasinShp$BasinID),
-                       label = paste0("BasinID = ",BasinShp$BasinID))
+                       popup = popups,
+                       label = paste0("BasinID = ",BasinShp$BasinID),
+                       clusterOptions = markerClusterOptions())
+
         }
 
         if(!is.null(input$Input_temp_raster$datapath)){
