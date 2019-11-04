@@ -214,7 +214,7 @@ hru_lc_ratio<-function(classname,shp,field=NULL,mcores=1){
     class1<-crop(class,polygon1)
     class_ratio<-as.data.frame(table(matrix(class1))/sum(table(matrix(class1))))
     names(class_ratio)<-c("Class","Ratio")
-    class_ratio$Ratio<-round(class_ratio$Ratio,2)
+    class_ratio$Ratio<-round(class_ratio$Ratio,3)
     class_ratio$Count<-table(matrix(class1))
     class_ratio[field]<-polygon1@data[field]
     return(class_ratio)
@@ -227,7 +227,7 @@ hru_lc_ratio<-function(classname,shp,field=NULL,mcores=1){
   }else{
     class_ratio<-as.data.frame(table(matrix(class))/sum(table(matrix(class))))
     names(class_ratio)<-c("Class","Ratio")
-    class_ratio$Ratio<-round(class_ratio$Ratio,2)
+    class_ratio$Ratio<-round(class_ratio$Ratio,3)
     class_ratio$Count<-table(matrix(class))
     class_ratio[field]<-polygon1@data[field]
     lc_ratio<-class_ratio
@@ -245,7 +245,7 @@ f_landlai<-function(lcfname,laifname,Basins,byfield,yr.start){
   lcs<-paste0("Lc_",unique(raster(lcfname)))
 
   f_fillmatix<-function(a,lcs){
-    a<-round(a,2)
+    a<-round(a,3)
     prel<-length(a[1,])+1
     if(prel< length(lcs)+1){
       lacks<-lcs[which(! lcs %in%  colnames(a))]
