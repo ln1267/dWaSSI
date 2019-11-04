@@ -30,7 +30,7 @@ theme_ning<-function(size.axis=5,size.title=6){
     )
 }
 
-f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,start,scale="month",weight=T,plot=T){
+f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,yr.start,scale="month",weight=T,plot=T){
   require(dplyr)
   require(raster)
   require(tidyr)
@@ -50,7 +50,7 @@ f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,start,sca
   }
 
   if(scale=="month" | scale=="Month" | scale=="MONTH"){
-    dates<-seq(as.Date(paste0(start,"-01-01")),by="1 month",length.out = dim(da)[3])
+    dates<-seq(as.Date(paste0(yr.start,"-01-01")),by="1 month",length.out = dim(da)[3])
     sta_catchment<-t(ex)%>%
       round(digits = 3)%>%
       as.data.frame()%>%
@@ -62,7 +62,7 @@ f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,start,sca
     names(sta_catchment)<-c(zonal_field,"Year","Month",varname)
 
   }else if(scale=="annual" | scale=="Annual" | scale=="ANNUAL"){
-    dates<-seq(as.Date(paste0(start,"-01-01")),by="1 year",length.out = dim(da)[3])
+    dates<-seq(as.Date(paste0(yr.start,"-01-01")),by="1 year",length.out = dim(da)[3])
     sta_catchment<-t(ex)%>%
       round(digits = 3)%>%
       as.data.frame()%>%
@@ -74,7 +74,7 @@ f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,start,sca
     names(sta_catchment)<-c(zonal_field,"Year",varname)
 
   }else{
-    dates<-seq(as.Date(paste0(start,"-01-01")),by="1 day",length.out = dim(da)[3])
+    dates<-seq(as.Date(paste0(yr.start,"-01-01")),by="1 day",length.out = dim(da)[3])
 
     sta_catchment<-t(ex)%>%
       round(digits = 3)%>%
@@ -126,7 +126,7 @@ hru_lc_zonal<-function(classname,daname,shp,fun='mean',field=NULL,plot=T){
 
   # funtion for zonal each polygon
   f_zonal<-function(i){
-    print(i)
+    #print(i)
     polygon1<-shp[i,]
     class1<-crop(class,polygon1)
     polygon1<-spTransform(polygon1,crs(da))
@@ -211,7 +211,7 @@ hru_lc_ratio<-function(classname,shp,field=NULL,mcores=1){
 }
 
 # this function is used for zonal LAI of each lc in the HRU
-f_landlai<-function(lcfname,laifname,Basins,byfield,yr.start,yr.end){
+f_landlai<-function(lcfname,laifname,Basins,byfield,yr.start){
   hru_lai<-hru_lc_zonal(classname = lcfname,
                         daname =laifname,
                         shp = Basins,
@@ -227,16 +227,18 @@ f_landlai<-function(lcfname,laifname,Basins,byfield,yr.start,yr.end){
       colnames(a)[prel:length(a[1,])]<-lacks
       a<-a[,lcs]
     }
+    a
   }
-
+  dates<-seq(as.Date(paste0(yr.start,"-01-01")),by="1 year",length.out = dim(da)[3])
   ha<-lapply(hru_lai, f_fillmatix,lcs)
   hru_lais<-do.call(rbind,ha)
   hru_lais<-cbind("BasinID"=rep(as.integer(names(hru_lai)),each=length(hru_lai[[1]][,1])),
-                  "Year"=rep(c(yr.start:yr.end),each=12),
+                  "Year"=rep(c(yr.start:(length(hru_lai[[1]][,1])/12+yr.start-1)),each=12),
                   "Month"=c(1:12),
                   hru_lais)
   hru_lais<-as.data.frame(hru_lais)
   hru_lais<-arrange(hru_lais,BasinID,Year,Month)
+  hru_lais[is.na(hru_lais)]<-0
   return(hru_lais)
 }
 
@@ -319,6 +321,79 @@ multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
     }
   }
 }
+
+f_stream_level_pete<-function(streamfile=NA,mc_cores=1){
+
+  stream<-read.csv(streamfile)
+  stream_level<-stream[c("FROM","TO")]
+  stream_level$LEVEL<-NA
+
+  lev<-1
+  for (i in c(1:500)){
+
+    if(lev==1){
+      index_lev_down<-which(!stream_level$TO %in% stream_level$FROM)
+      stream_level$LEVEL[index_lev_down]<-lev
+      lev<-lev+1
+    }
+
+    index_lev_up<-which(stream_level$TO %in% stream_level$FROM[index_lev_down])
+    stream_level$LEVEL[index_lev_up]<-lev
+    index_lev_down<-index_lev_up
+    lev<-lev+1
+  }
+
+  return(stream_level)
+}
+
+f_upstreamHUCs<-function(BasinID){
+  level_to<-routpar$LEVEL[routpar$TO==BasinID]
+  upids<-NA
+  To<-BasinID
+  if(length(level_to)>0){
+
+    while (length(level_to)>0){
+      FROM_HUCs<-routpar$FROM[routpar$TO %in% To]
+
+      upids<-c(upids,FROM_HUCs)
+
+      TO<-routpar$FROM[routpar$TO %in% To]
+
+      level_to<-routpar$LEVEL[routpar$TO %in% To]
+
+    }
+
+    return(upids[-1])
+  }else{
+    return(NULL)
+  }
+
+}
+
+hrurouting<-function(Flwdata,routpar,mc_cores=1){
+  library(parallel)
+  max_level<-max(routpar$LEVEL)
+
+  hru_accm<-function(hru,water,routpar){
+    hru<-as.numeric(hru)
+    water$flow[water$BasinID==hru] +sum(water$flow[water$BasinID %in% routpar$FROM[which(routpar$TO==hru)]])
+  }
+
+  for (level in c(max_level:1)){
+    hrus<-unique(routpar$TO[routpar$LEVEL==level])
+    #print(paste0("There are ",length(hrus)," hrus in level ",level))
+
+    if(length(hrus)>100) {
+      flowaccu<-mclapply(hrus,hru_accm,water=Flwdata,routpar=routpar,mc.cores = mc_cores)
+      #print("using paralell")
+    }else{
+      flowaccu<-lapply(hrus,hru_accm,water=Flwdata,routpar=routpar)
+    }
+    for (i in c(1:length(hrus))) Flwdata$flow[Flwdata$BasinID==hrus[i]]<- flowaccu[[i]]
+  }
+  return(water)
+}
+
 
 librs<-c("dplyr","raster","ggplot2","leaflet","rgdal","rgeos","leaflet.extras","parallel")
 f_lib_check(librs)
