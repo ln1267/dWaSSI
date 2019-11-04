@@ -18,12 +18,10 @@ shinyUI(
                  ## HTML: introduction of the input data
                  HTML("<p>The input data of dWaSSIC model includes:</p>
                         <ol>
-                        <li>Watershed infomation</li>
-                        <li>Monthly climate time series for each HRU</li>
-                        <li>Monthly LAI data</li>
-                        <li>Landcover</li>
-                        <li>Soil parameters</li>
-                        <li>Shapefiles of your study area (Optional)</li>
+                        <li>Watershed characters for each Hydrologic research unit (HRU);</li>
+                        <li>Monthly climate time series for each HRU;</li>
+                        <li>Monthly LAI time series for each land cover in each HRU;</li>
+                        <li>Soil parameters for each HRU.</li>
                         </ol>"),
                  tags$hr(),
                  # Action: Read input data ----
@@ -33,7 +31,7 @@ shinyUI(
                  ## Choose each file----
                  fileInput("Input_cellinfo", "Cellinfo [HRUID, Latitude, Longitude, Elevation_m, Area_m2 and ratio for each lc]"),
                  fileInput("Input_climate", "Monthly Climate [HRUID, Year, Month, Precip_mm, Tmean_C]"),
-                 fileInput("Input_LAI", "Monthly LAI [HRUID, Year, Month, LAI]"),
+                 fileInput("Input_LAI", "Monthly LAI [HRUID, Year, Month, and LAI for each lc]"),
                  fileInput("Input_soilinfo", "Soil info [HRUID, uztwm,uzfwm,uzk,zperc,rexp,lztwm,lzfsm,lzfpm,lzsk,lzpk,pfree]")
 
                ),
@@ -90,6 +88,7 @@ shinyUI(
                  HTML("<p>It will take a while for the data process. Please wait ...</p>
                       "),
                  leafletOutput("basinrastermap"),
+                 tags$h4("Processing log:"),
                  verbatimTextOutput("printprocessinginfo"),
                  verbatimTextOutput("prntraster")
 
