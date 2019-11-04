@@ -133,10 +133,9 @@ shinyUI(
                  actionButton("plotdata","Plot the selected input data!")
                ),
 
-               # MainPanel for upload data----
+               # MainPanel for ploting data----
                mainPanel(
 
-                 ## Output: Plot of the selected two columns----
                  h2("Plot the selected input dataset!"),
                  tags$html("This is the processing log:"),
                  verbatimTextOutput("printplottinginfo"),
@@ -151,40 +150,34 @@ shinyUI(
              sidebarLayout(
                sidebarPanel(
                  # Application title
-                 titlePanel("Select the station and timeperiod for simulation"),
+                 titlePanel("Select the outlet station's BasinID and timeperiod for simulation"),
                  ## HTML: Introduction ----
-                  HTML("<p>Please select a station for simulation:</p>
-                      <ol>
-                      <li>Climate data</li>
-                      <li>LAI data</li>
-                      <li>Landcover</li>
-                      <li>Soil</li>
-                      </ol>"),
-                 tags$hr(),
+
                  ## Input: Select a Station ----
-                 textInput("StationID", "Type the BasinID for simulation","1"
+                 textInput("StationID", "Type the BasinID of the hydrologic station!","1"
                  ),
 
-                 # Input: Time range for subsetting ----
-                 dateRangeInput("subsetdaterange","Select the date range for simulation"),
+                 # # Input: Time range for subsetting ----
+                 dateRangeInput("dateSimulation","Select the date range for simulation"),
 
                  # Action: Subset data ----
-                 actionButton("subdata","Run Subset"),
-                 verbatimTextOutput("subsetdata"),
+                 actionButton("subSimData","Subset the selected dataset"),
+
                  # Input: Simulation period
-                 sliderInput("simulatedaterange", "Year simulation", 1970, 2017, value = c(2000, 2010)),
+                 #sliderInput("dateSimulation", "Year simulation", 1970, 2017, value = c(2000, 2010)),
                  # Input: Checkbox if calibate model ----
                  checkboxInput("Calibration", "Calibration", FALSE),
                  ## Action: run model
-                 actionButton("runmodel","Run Simulation")
+                 actionButton("runSimulation","Run Simulation"),
+                 tags$hr(),
+                 tags$h5("Simulation log:"),
+                 verbatimTextOutput("simulating")
                   ),
 
                  # Mainpanel: of Simulation----
                  mainPanel(
 
-                   h2("Simulate water and carbon processes"),
 
-                   tags$hr(),
                    h2("Plot water and carbon processes"),
                   # Input: Result plot variables ----
                   checkboxGroupInput("plotvars","Select the variables to plot",c("P","T","Q"),inline = T),
