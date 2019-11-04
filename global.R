@@ -206,7 +206,7 @@ hru_lc_ratio<-function(classname,shp,field=NULL,mcores=1){
   require(sp)
 
   class<-raster(classname)
-  shp<-spTransform(shp,crs(class))
+  if (!compareCRS(shp,class)) shp<-spTransform(shp,crs(class))
   class<-crop(class,shp)
   class<-mask(class,shp)
   print(table(matrix(class)))
@@ -272,11 +272,13 @@ f_landlai<-function(lcfname,laifname,Basins,byfield,yr.start){
 
 f_cellinfo<-function(classfname,Basins,byfield="BasinID",demfname=NULL){
   require(tidyr)
+  require(dplyr)
+  require(raster)
   hru_lcs<-hru_lc_ratio(classname =classfname,
                         shp = Basins,
                         field = byfield)%>%
     mutate(Class=paste0("Lc_",Class))%>%
-    select(-Count)%>%
+    dplyr::select(-Count)%>%
     spread(Class, Ratio,fill=0)
 
   if(!"Elev_m" %in% names(Basins) & !is.null(demfname)){
@@ -286,7 +288,7 @@ f_cellinfo<-function(classfname,Basins,byfield="BasinID",demfname=NULL){
   }
 
   cellinfo<-Basins@data%>%
-    select(one_of(c(byfield,"Area_m2","Latitude","Longitude","Elev_m","Flwlen_m")))%>%
+    dplyr::select(one_of(c(byfield,"Area_m2","Latitude","Longitude","Elev_m","Flwlen_m")))%>%
     arrange(get(byfield))%>%
     mutate(Area_m2=round(Area_m2,1))%>%
  #   mutate(Elev_m=round(Elev_m,1))%>%

@@ -29,10 +29,10 @@ shinyUI(
                  HTML("<p>You can prepare those files as a 'csv/txt' format.</p>
                       "),
                  ## Choose each file----
-                 fileInput("Input_cellinfo", "Cellinfo [HRUID, Latitude, Longitude, Elevation_m, Area_m2 and ratio for each lc]"),
-                 fileInput("Input_climate", "Monthly Climate [HRUID, Year, Month, Precip_mm, Tmean_C]"),
-                 fileInput("Input_LAI", "Monthly LAI [HRUID, Year, Month, and LAI for each lc]"),
-                 fileInput("Input_soilinfo", "Soil info [HRUID, uztwm,uzfwm,uzk,zperc,rexp,lztwm,lzfsm,lzfpm,lzsk,lzpk,pfree]")
+                 fileInput("Input_cellinfo", "Cellinfo [BasinID, Latitude, Longitude, Elevation_m, Area_m2 and ratio for each lc]"),
+                 fileInput("Input_climate", "Monthly Climate [BasinID, Year, Month, Precip_mm, Tmean_C]"),
+                 fileInput("Input_LAI", "Monthly LAI [BasinID, Year, Month, and LAI for each lc]"),
+                 fileInput("Input_soilinfo", "Soil info [BasinID, uztwm,uzfwm,uzk,zperc,rexp,lztwm,lzfsm,lzfpm,lzsk,lzpk,pfree]")
 
                ),
 
@@ -40,6 +40,7 @@ shinyUI(
                mainPanel(
                  ## Output: Summary of the selected plotting file----
                  h2("The summary of the input file"),
+                 tags$h6("Process log: "),
                  verbatimTextOutput("printreadinginfo"),
                  verbatimTextOutput("printsummary")
                )
@@ -154,7 +155,7 @@ shinyUI(
                  ## HTML: Introduction ----
 
                  ## Input: Select a Station ----
-                 textInput("StationID", "Type the BasinID of the hydrologic station!","1"
+                 textInput("StationID", "Type the BasinID of the hydrologic station!","0"
                  ),
 
                  # # Input: Time range for subsetting ----
