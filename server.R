@@ -312,11 +312,6 @@ shinyServer(function(input, output,session) {
           f_addinfo("plotting","It does have this data.")
           return()}
         plotvars<-strsplit(input$plotvar,",")[[1]]
-        if(input$daname2plot=="LAI" & sum(plotvars %in% names(data_input[[input$daname2plot]]))<1) {
-
-          f_addinfo("plotting",paste0("You can select these variables from LAI data: ",paste(names(data_input[[input$daname2plot]]),collapse=",")))
-          return()
-        }
         basinids<-as.integer(strsplit(input$plotBasinID,",")[[1]])
         if(sum(basinids %in% data_input[[input$daname2plot]]$BasinID)<1) {
 
@@ -334,16 +329,32 @@ shinyServer(function(input, output,session) {
           f_addinfo("plotting","No data!")
           return()}
 
+        # test for LAI data
+        if(input$daname2plot=="LAI" & sum(plotvars %in% names(data_input[[input$daname2plot]]))<1) {
+
+          f_addinfo("plotting",paste0("You can select these variables from LAI data: ",paste(names(data_input[[input$daname2plot]]),collapse=",")))
+          return()
+        }else if (input$daname2plot=="LAI" & sum(plotvars %in% names(data_input[[input$daname2plot]]))>=1){
+
+          var_indx<-which(!plotvars %in% names(data_input[[input$daname2plot]]))
+          if(sum(var_indx)>0) {
+            f_addinfo("plotting",paste0("Warning: These variables are not included: ",paste(plotvars[var_indx],collapse=",")))
+            plotvars<-plotvars[-var_indx]
+          }
+          f_addinfo("plotting",paste0("Print data for variables: ",paste(plotvars,collapse=",")))
+
+        }
+
     output$Plotinput <- renderPlot({
         input$plotdata
         if(input$daname2plot == "Climate"){
 
-          p1<-ggplot(df,aes(x=Date,y=Ppt_mm))+geom_line()+geom_point()+
+          p1<-ggplot(df,aes(x=Date,y=Ppt_mm))+geom_line(col="blue")+geom_point(col="blue")+
             ggtitle(paste0("Monthly Precipitation (mm/month)"))+
-            facet_wrap(BasinID~.,ncol=3)+
+            facet_wrap(BasinID~.,ncol=2)+
             scale_x_date(date_breaks = "1 year", date_labels = "%Y")+
             theme_ning(size.axis = 12,size.title = 14)
-          p2<-ggplot(df,aes(x=Date,y=Tavg_C))+geom_line()+geom_point()+
+          p2<-ggplot(df,aes(x=Date,y=Tavg_C))+geom_line(col="forestgreen")+geom_point(col="forestgreen")+
             ggtitle(paste0("Monthly mean temperature (C)"))+
             facet_wrap(BasinID~.,ncol=2)+
             scale_x_date(date_breaks = "1 year", date_labels = "%Y")+
@@ -352,7 +363,8 @@ shinyServer(function(input, output,session) {
           multiplot(p1,p2,cols = 1)
 
         }else if(input$daname2plot == "LAI"){
-         df%>%
+
+          df%>%
             dplyr::select(one_of(c("BasinID","Date"),plotvars))%>%
             gather(Lcs,LAI,plotvars)%>%
             ggplot(aes(x=Date,y=LAI,col=Lcs))+geom_line()+geom_point()+
