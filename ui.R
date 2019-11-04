@@ -65,12 +65,16 @@ shinyUI(
                   HTML("<p>Please chose a '*.tif' or '*.nc' monthly stacked precipitation and temperation file to upload.</p>
                       "),
 
-                 fileInput('Input_dem_raster', 'Choose elevation raster file', multiple=FALSE, accept="tif"),
+                 fileInput('Input_dem_raster', 'Choose elevation raster file (Optional)', multiple=FALSE, accept="tif"),
                  fileInput('Input_lc_raster', 'Choose land cover raster file', multiple=FALSE, accept="tif"),
                  textInput("yearStartClimate", "Start year of climate data","2000"),
                  fileInput('Input_temp_raster', 'Choose monthly temperature raster file', multiple=FALSE, accept="tif"),
                  fileInput('Input_precp_raster', 'Choose monthly precipitation raster file', multiple=FALSE, accept="tif"),
                  textInput("yearStartLai", "Start year of Lai data","2000"),
+                 # shinyFilesButton("Input_lai_fpath", "Choose a file" ,
+                 #                  title = "Please select a file:", multiple = FALSE,
+                 #                  buttonType = "default", class = NULL),
+                 textInput("Input_lai_fpath", "Type in the lai data path","~"),
                  fileInput('Input_lai_raster', 'Choose monthly LAI raster file', multiple=FALSE, accept="tif"),
                  fileInput('Input_soil_raster', 'Choose Soil raster file', multiple=FALSE, accept="tif"),
                  fileInput('Input_imp_raster', 'Choose impverious raster file [Optional]', multiple=FALSE, accept="tif")
@@ -89,7 +93,11 @@ shinyUI(
                       "),
                  leafletOutput("basinrastermap"),
                  tags$h4("Processing log:"),
+                 tags$h5("We recommand upload all raster are in the same projection and cellsize!"),
+                 tags$h5("It will take more time to process,
+                         if your land cover data's cellsize is much smaller than your LAI data."),
                  verbatimTextOutput("printprocessinginfo"),
+                 verbatimTextOutput("txt_file"),
                  verbatimTextOutput("prntraster")
 
 
