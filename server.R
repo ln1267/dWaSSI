@@ -357,6 +357,8 @@ shinyServer(function(input, output,session) {
         data2plot<-input$daname2plot
         basinids<-as.integer(strsplit(input$plotBasinID,",")[[1]])
         plotvars<-strsplit(input$plotvar,",")[[1]]
+        plotvarname<-strsplit(input$varnames,",")[[1]]
+        plotbasinname<-strsplit(input$Basinnames,",")[[1]]
         yr.start<-input$plotyrrange[1]; yr.end<-input$plotyrrange[2]
         plotmonths<-input$plotmonths
 
@@ -393,10 +395,13 @@ shinyServer(function(input, output,session) {
           return()
         }else if (data2plot=="LAI" & sum(plotvars %in% names(data_input[[data2plot]]))>=1){
 
+          if(length(plotvarname)!=length(plotvars)) f_addinfo("plotting","!!! Warning: You need to provide the same number of names as the variable.")
           var_indx<-which(!plotvars %in% names(data_input[[data2plot]]))
           if(sum(var_indx)>0) {
-            f_addinfo("plotting",paste0("Warning: These variables are not included: ",paste(plotvars[var_indx],collapse=",")))
+            f_addinfo("plotting",paste0("!!! Warning: These variables are not included: ",paste(plotvars[var_indx],collapse=",")))
             plotvars<-plotvars[-var_indx]
+            plotvarname<-plotvarname[-var_indx]
+
           }
           f_addinfo("plotting",paste0("Printed variables: ",paste(plotvars,collapse=",")))
 
@@ -421,12 +426,16 @@ shinyServer(function(input, output,session) {
 
         }else if(data2plot == "LAI"){
 
-          df%>%
+          df<-df%>%
             dplyr::select(one_of(c("BasinID","Date"),plotvars))%>%
-            gather(Lcs,LAI,plotvars)%>%
-            ggplot(aes(x=Date,y=LAI,col=Lcs))+geom_line()+geom_point()+
+            gather(Lcs,LAI,plotvars)
+          if(length(plotvarname)==length(plotvars)) df$Lcs<-factor(df$Lcs,levels =plotvars,labels = plotvarname)
+
+          df%>%
+            ggplot(aes(x=Date,y=LAI,col=Lcs,shape=Lcs))+geom_line()+geom_point()+
             ggtitle(paste0("Monthly Leaf area index (m2/m2)"))+
             facet_wrap(BasinID~.,ncol=2)+
+            labs(col = "land cover",shape="land cover")+
             scale_x_date(date_breaks = "1 year", date_labels = "%Y")+
             theme_ning(size.axis = 12,size.title = 14)
 

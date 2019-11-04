@@ -117,7 +117,9 @@ shinyUI(
                              choices=c("Climate","LAI")),
                  ## Input: Select a variable ----
                  textInput("plotvar", "Type the variable name for ploting","Ppt_mm"),
+                 textInput("varnames", "Type the printing name for those variables","Ppt_mm"),
                  textInput("plotBasinID", "Type the BasinID name for ploting","1"),
+                 textInput("Basinnames", "Type the printing name for those Basins","ID1"),
                  # Input: Year for plotting ---
                  sliderInput("plotyrrange", "Select the year range", 1970, 2017, value = c(2000, 2010)),
                  # Input: Month ----
