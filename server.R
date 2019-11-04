@@ -101,15 +101,20 @@ shinyServer(function(input, output,session) {
     # process Climate input
     if(is.null(input$Input_temp_raster)| is.null(input$Input_precp_raster)){
       f_addinfo("processing","Warning: You need to provide the climate raster time series!")
+
+    }else if("Climate" %in% names(data_input)){
+      f_addinfo("processing","Warning: Climate data has been processed!")
+
     }else{
+
       f_addinfo("processing","Processing climate data ...")
-      Tmean_catchment<-f_sta_shp_nc(input$Input_temp_raster$datapath,BasinShp,varname = "Tavg_C",start = 2000,zonal_field = "BasinID")
-      Pre_catchment<-f_sta_shp_nc(input$Input_precp_raster$datapath,BasinShp,varname = "Ppt_mm",start = 2000,zonal_field = "BasinID")
+      Tmean_catchment<-f_sta_shp_nc(input$Input_temp_raster$datapath,BasinShp,varname = "Tavg_C",start = input$yearStartClimate,zonal_field = "BasinID")
+      Pre_catchment<-f_sta_shp_nc(input$Input_precp_raster$datapath,BasinShp,varname = "Ppt_mm",start = input$yearStartClimate,zonal_field = "BasinID")
       climate<-Pre_catchment%>%
         mutate(Tavg_C=Tmean_catchment$Tavg_C)%>%
         arrange(BasinID,Year,Month)%>%
-        mutate(Ppt_mm=round(Ppt_mm,2))%>%
-        mutate(Tavg_C=round(Tavg_C,2))%>%
+        mutate(Ppt_mm=round(Ppt_mm,3))%>%
+        mutate(Tavg_C=round(Tavg_C,3))%>%
         dplyr::select(BasinID,Year,Month,Ppt_mm,Tavg_C)
       data_input[["Climate"]]<<-climate
       f_addinfo("processing","Finished processing climate input!")
@@ -120,6 +125,10 @@ shinyServer(function(input, output,session) {
     # Process cellinfo
     if(is.null(input$Input_lc_raster)){
       f_addinfo("processing","Warning: There is no land cover input!")
+
+    }else if("Cellinfo" %in% names(data_input)){
+      f_addinfo("processing","Warning: Cellinfo data has been processed!")
+
     }else{
       f_addinfo("processing","processing Cellinfo data ...")
       print(paste0("processing Cellinfo ..."))
@@ -133,20 +142,28 @@ shinyServer(function(input, output,session) {
       # process LAI input
     if(is.null(input$Input_lc_raster) | is.null(input$Input_lai_raster) ){
       f_addinfo("processing","Warning: There is no land cover or LAI data!")
+
+    }else if("LAI" %in% names(data_input)){
+      f_addinfo("processing","Warning: LAI data has been processed!")
+
     }else{
       laiinfo<-f_landlai(lcfname=input$Input_lc_raster$datapath,
                           laifname=input$Input_lai_raster$datapath,
                           Basins=BasinShp,
                           byfield="BasinID",
-                          yr.start=1982,
-                          yr.end=2014)
+                          yr.start=input$yearStartLai)
       data_input[["LAI"]]<<-laiinfo
       f_addinfo("processing","Finished processing Lai data!")
     }
       # process SOIL input
-    if(is.null(input$Input_soil_raster) | is.null(input$Input_lai_raster) ){
+    if(is.null(input$Input_soil_raster)){
       f_addinfo("processing","Warning: There is no soil data!")
-    }else{
+
+      }else if("Soilinfo" %in% names(data_input)){
+      f_addinfo("processing","Warning: Soilinfo data has been processed!")
+
+      }else{
+        print("Processing Soilinfo")
       soilinfo<-f_soilinfo(soilfname=input$Input_soil_raster$datapath,
                           Basins=BasinShp)
       data_input[["Soilinfo"]]<<-soilinfo
