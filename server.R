@@ -210,6 +210,7 @@ shinyServer(function(input, output,session) {
 
 
       output$basinrastermap <- renderLeaflet({
+        input$plotrasterdata
         # Plot the BasinShp
         input_leaflet<-leaflet() %>%
             addTiles(group = "OSM (default)") %>%
