@@ -66,16 +66,20 @@ shinyUI(
                       "),
 
                  fileInput('Input_dem_raster', 'Choose elevation raster file (Optional)', multiple=FALSE, accept="tif"),
+                 checkboxInput("updateLc", "Update land cover", FALSE),
                  fileInput('Input_lc_raster', 'Choose land cover raster file', multiple=FALSE, accept="tif"),
-                 textInput("yearStartClimate", "Start year of climate data","2000"),
+                 textInput("yearStartClimate", "Start year of climate data","2000",width = "50%"),
+                 checkboxInput("updateClimate", "Update", FALSE),
                  fileInput('Input_temp_raster', 'Choose monthly temperature raster file', multiple=FALSE, accept="tif"),
                  fileInput('Input_precp_raster', 'Choose monthly precipitation raster file', multiple=FALSE, accept="tif"),
-                 textInput("yearStartLai", "Start year of Lai data","2000"),
+                 textInput("yearStartLai", "Start year of Lai data","2000",width = "50%"),
+                 checkboxInput("updateLai", "Update", FALSE),
                  # shinyFilesButton("Input_lai_fpath", "Choose a file" ,
                  #                  title = "Please select a file:", multiple = FALSE,
                  #                  buttonType = "default", class = NULL),
                  textInput("Input_lai_fpath", "Type in the lai data path","~"),
                  fileInput('Input_lai_raster', 'Choose monthly LAI raster file', multiple=FALSE, accept="tif"),
+                 checkboxInput("updateSoil", "Update", FALSE),
                  fileInput('Input_soil_raster', 'Choose Soil raster file', multiple=FALSE, accept="tif"),
                  fileInput('Input_imp_raster', 'Choose impverious raster file [Optional]', multiple=FALSE, accept="tif")
 
@@ -119,7 +123,7 @@ shinyUI(
                  textInput("plotvar", "Type the variable name for ploting","Ppt_mm"),
                  textInput("varnames", "Type the printing name for those variables","Ppt_mm"),
                  textInput("plotBasinID", "Type the BasinID name for ploting","1"),
-                 textInput("Basinnames", "Type the printing name for those Basins","ID1"),
+                 #textInput("Basinnames", "Type the printing name for those Basins","ID1"),
                  # Input: Year for plotting ---
                  sliderInput("plotyrrange", "Select the year range", 1970, 2017, value = c(2000, 2010)),
                  # Input: Month ----

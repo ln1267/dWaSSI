@@ -116,7 +116,7 @@ shinyServer(function(input, output,session) {
     if(is.null(input$Input_temp_raster)| is.null(input$Input_precp_raster)){
       f_addinfo("processing","Warning: You need to provide the climate raster time series!")
 
-    }else if("Climate" %in% names(data_input)){
+    }else if("Climate" %in% names(data_input) & ! input$updateClimate){
       f_addinfo("processing","Warning: Climate data has been processed!")
 
     }else{
@@ -140,7 +140,7 @@ shinyServer(function(input, output,session) {
     if(is.null(input$Input_lc_raster)){
       f_addinfo("processing","Warning: There is no land cover input!")
 
-    }else if("Cellinfo" %in% names(data_input)){
+    }else if("Cellinfo" %in% names(data_input) & ! input$updateLc){
       f_addinfo("processing","Warning: Cellinfo data has been processed!")
 
     }else{
@@ -157,7 +157,7 @@ shinyServer(function(input, output,session) {
     if(is.null(input$Input_lc_raster) | (is.null(input$Input_lai_raster) & input$Input_lai_fpath=="~" )){
       f_addinfo("processing","Warning: There is no land cover or LAI data!")
 
-    }else if("LAI" %in% names(data_input)){
+    }else if("LAI" %in% names(data_input) & ! input$updateLai){
       f_addinfo("processing","Warning: LAI data has been processed!")
 
     }else{
@@ -176,7 +176,7 @@ shinyServer(function(input, output,session) {
     if(is.null(input$Input_soil_raster)){
       f_addinfo("processing","Warning: There is no soil data!")
 
-      }else if("Soilinfo" %in% names(data_input)){
+      }else if("Soilinfo" %in% names(data_input) & ! input$updateSoil){
       f_addinfo("processing","Warning: Soilinfo data has been processed!")
 
       }else{
@@ -358,7 +358,7 @@ shinyServer(function(input, output,session) {
         basinids<-as.integer(strsplit(input$plotBasinID,",")[[1]])
         plotvars<-strsplit(input$plotvar,",")[[1]]
         plotvarname<-strsplit(input$varnames,",")[[1]]
-        plotbasinname<-strsplit(input$Basinnames,",")[[1]]
+       # plotbasinname<-strsplit(input$Basinnames,",")[[1]]
         yr.start<-input$plotyrrange[1]; yr.end<-input$plotyrrange[2]
         plotmonths<-input$plotmonths
 
@@ -432,7 +432,7 @@ shinyServer(function(input, output,session) {
           if(length(plotvarname)==length(plotvars)) df$Lcs<-factor(df$Lcs,levels =plotvars,labels = plotvarname)
 
           df%>%
-            ggplot(aes(x=Date,y=LAI,col=Lcs,shape=Lcs))+geom_line()+geom_point()+
+            ggplot(aes(x=Date,y=LAI,col=Lcs,shape=Lcs))+geom_line()+geom_point(size=2.5)+
             ggtitle(paste0("Monthly Leaf area index (m2/m2)"))+
             facet_wrap(BasinID~.,ncol=2)+
             labs(col = "land cover",shape="land cover")+
