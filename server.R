@@ -108,8 +108,8 @@ shinyServer(function(input, output,session) {
     }else{
 
       f_addinfo("processing","Processing climate data ...")
-      Tmean_catchment<-f_sta_shp_nc(input$Input_temp_raster$datapath,BasinShp,varname = "Tavg_C",start = input$yearStartClimate,zonal_field = "BasinID")
-      Pre_catchment<-f_sta_shp_nc(input$Input_precp_raster$datapath,BasinShp,varname = "Ppt_mm",start = input$yearStartClimate,zonal_field = "BasinID")
+      Tmean_catchment<-f_sta_shp_nc(input$Input_temp_raster$datapath,BasinShp,varname = "Tavg_C",yr.start = input$yearStartClimate,zonal_field = "BasinID")
+      Pre_catchment<-f_sta_shp_nc(input$Input_precp_raster$datapath,BasinShp,varname = "Ppt_mm",yr.start = input$yearStartClimate,zonal_field = "BasinID")
       climate<-Pre_catchment%>%
         mutate(Tavg_C=Tmean_catchment$Tavg_C)%>%
         arrange(BasinID,Year,Month)%>%
