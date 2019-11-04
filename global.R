@@ -160,7 +160,8 @@ hru_lc_zonal<-function(classname,daname,shp,fun='mean',field=NULL,plot=T){
     da1<-crop(da,polygon1)
     if (!compareCRS(polygon1,class1)) polygon1<-spTransform(polygon1,crs(class1))
     polygon1<-spTransform(polygon1,crs(class1))
-    if (res(class1)!=res(da1) | !compareCRS(da1,class1)) da1<-projectRaster(da1,class1,method='ngb')
+    if(!sum(res(da1)==res(class1))==2) da1<-projectRaster(da1,class1,method='ngb')
+    if(!extent(class1)==extent(da1)) extent(class1)=extent(da1)
     class1<-raster::mask(class1,polygon1)
     da1<-raster::mask(da1,polygon1)
     if(sum(unique(class1))<1){
@@ -260,7 +261,7 @@ f_landlai<-function(lcfname,laifname,Basins,byfield,yr.start){
   ha<-lapply(hru_lai, f_fillmatix,lcs)
   hru_lais<-do.call(rbind,ha)
   hru_lais<-cbind("BasinID"=rep(as.integer(names(hru_lai)),each=length(hru_lai[[1]][,1])),
-                  "Year"=rep(c(yr.start:(length(hru_lai[[1]][,1])/12+yr.start-1)),each=12),
+                  "Year"=rep(c(as.integer(yr.start):(length(hru_lai[[1]][,1])/12+as.integer(yr.start)-1)),each=12),
                   "Month"=c(1:12),
                   hru_lais)
   hru_lais<-as.data.frame(hru_lais)
