@@ -123,7 +123,8 @@ shinyUI(
                mainPanel(
 
                  ## Output: Plot of the selected two columns----
-                 h2("Please select two columns to plot the data"),
+                 h2("Plot the selected input dataset!"),
+                 tags$html("This is the processing log:"),
                  verbatimTextOutput("printplottinginfo"),
                  verbatimTextOutput("distPloterror"),
 

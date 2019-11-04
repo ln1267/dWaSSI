@@ -306,48 +306,49 @@ shinyServer(function(input, output,session) {
   ## Plot: Plot selected input data ----
   observeEvent(input$plotdata,{
         inforprint$plotting<-"Plotting log: "
-        print(paste0("Print data ....",input$daname2plot))
-        f_addinfo("plotting","Print the selected data ...")
-        if(!input$daname2plot %in% names(data_input)) {
+        data2plot<-input$daname2plot
+        print(paste0("Print data ....",data2plot))
+        f_addinfo("plotting",paste0("Printing ",data2plot," data ..."))
+        if(!data2plot %in% names(data_input)) {
           f_addinfo("plotting","It does have this data.")
           return()}
         plotvars<-strsplit(input$plotvar,",")[[1]]
         basinids<-as.integer(strsplit(input$plotBasinID,",")[[1]])
-        if(sum(basinids %in% data_input[[input$daname2plot]]$BasinID)<1) {
+        if(sum(basinids %in% data_input[[data2plot]]$BasinID)<1) {
 
-          f_addinfo("plotting",paste0("It doesn't have this BasinID: ",paste(basinids,collapse=",")))
+          f_addinfo("plotting",paste0("!!! Warning: No BasinID: ",paste(basinids,collapse=",")))
           return()
         }
-        f_addinfo("plotting",paste0("Print data for BasinID: ",paste(basinids,collapse=",")))
-        df<-data_input[[input$daname2plot]]%>%
+        f_addinfo("plotting",paste0("Printed BasinID: ",paste(basinids,collapse=",")))
+        df<-data_input[[data2plot]]%>%
             filter(BasinID %in% basinids)%>%
             mutate(BasinID=factor(paste0("BasinID = ",BasinID)))%>%
             filter(Year>=input$plotyrrange[1] & Year<=input$plotyrrange[2])%>%
             filter(Month %in% input$plotmonths)%>%
             mutate(Date=as.Date(paste0(Year,"-",Month,"-","01")))
         if(nrow(df)<1) {
-          f_addinfo("plotting","No data!")
+          f_addinfo("plotting","!!! Warning: No data!")
           return()}
 
         # test for LAI data
-        if(input$daname2plot=="LAI" & sum(plotvars %in% names(data_input[[input$daname2plot]]))<1) {
-
-          f_addinfo("plotting",paste0("You can select these variables from LAI data: ",paste(names(data_input[[input$daname2plot]]),collapse=",")))
+        if(data2plot=="LAI" & sum(plotvars %in% names(data_input[[data2plot]]))<1) {
+          f_addinfo("plotting",paste0("!!! Warning: Could not find input variables: ",paste(plotvars,collapse=",")))
+          f_addinfo("plotting",paste0("You can select these variables from LAI data: ",paste(names(data_input[[data2plot]])[-c(1:3)],collapse=",")))
           return()
-        }else if (input$daname2plot=="LAI" & sum(plotvars %in% names(data_input[[input$daname2plot]]))>=1){
+        }else if (data2plot=="LAI" & sum(plotvars %in% names(data_input[[data2plot]]))>=1){
 
-          var_indx<-which(!plotvars %in% names(data_input[[input$daname2plot]]))
+          var_indx<-which(!plotvars %in% names(data_input[[data2plot]]))
           if(sum(var_indx)>0) {
             f_addinfo("plotting",paste0("Warning: These variables are not included: ",paste(plotvars[var_indx],collapse=",")))
             plotvars<-plotvars[-var_indx]
           }
-          f_addinfo("plotting",paste0("Print data for variables: ",paste(plotvars,collapse=",")))
+          f_addinfo("plotting",paste0("Printed variables: ",paste(plotvars,collapse=",")))
 
         }
 
     output$Plotinput <- renderPlot({
         input$plotdata
-        if(input$daname2plot == "Climate"){
+        if(data2plot == "Climate"){
 
           p1<-ggplot(df,aes(x=Date,y=Ppt_mm))+geom_line(col="blue")+geom_point(col="blue")+
             ggtitle(paste0("Monthly Precipitation (mm/month)"))+
@@ -362,7 +363,7 @@ shinyServer(function(input, output,session) {
 
           multiplot(p1,p2,cols = 1)
 
-        }else if(input$daname2plot == "LAI"){
+        }else if(data2plot == "LAI"){
 
           df%>%
             dplyr::select(one_of(c("BasinID","Date"),plotvars))%>%
