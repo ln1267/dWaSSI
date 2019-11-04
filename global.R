@@ -30,6 +30,32 @@ theme_ning<-function(size.axis=5,size.title=6){
     )
 }
 
+## Paste one to one for two vectors, matrixes or arrays----
+#' Paste by value one to one for two vectors, matrixes or arrays
+#' @param x The first object, which can be vector, matrix or array.
+#' @param y The second object, which can be vector, matrix or array.
+#' @param sep The separate letter
+#' @keywords paste
+#' @export
+#' @examples
+#' x<-c(1,2,3)
+#' y<-c("A","B","C")
+#' f_paste(x,y,sep="-")
+f_paste<-function(x,y,sep=""){
+  dimx<-dim(x)
+  if(is.null(dimx)){
+    sapply(c(1:length(x)),function(a) paste(x[a],y[a],sep=sep))
+  }else{
+    pas<-sapply(c(1:length(x)),function(a) paste(as.vector(x)[a],as.vector(y)[a],sep=sep))
+    if(length(dimx)==2){
+      matrix(pas,dimx)
+    }else{
+      array(pas,dimx)
+    }
+  }
+}
+
+
 f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,yr.start,scale="month",weight=T,plot=T){
   require(dplyr)
   require(raster)
