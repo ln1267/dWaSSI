@@ -62,7 +62,7 @@ f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,yr.start,
   require(tidyr)
   require(sp)
   da<-brick(ncfilename)
-  basin<-spTransform(basin,crs(da))
+  if (!compareCRS(basin,da))  basin<-spTransform(basin,crs(da))
   da<-crop(da,basin)
   #NAvalue(da)<- 0
   if(plot) {
@@ -124,12 +124,12 @@ hru_lc_zonal<-function(classname,daname,shp,fun='mean',field=NULL,plot=T){
   # read the class and data by their names
   class<-raster(classname)
   da<-brick(daname)
-
+  if(sum(res(da)==res(class))==2) crs(da)<-crs(class)
   # crop data based on the input shp
-  shp<-spTransform(shp,crs(da))
+  if (!compareCRS(shp,da)) shp<-spTransform(shp,crs(da))
   da<-crop(da,shp)
 
-  shp<-spTransform(shp,crs(class))
+  if (!compareCRS(shp,class)) shp<-spTransform(shp,crs(class))
   class<-crop(class,shp)
 
   # resample class data based on the input data (Their geo reference could be different)
@@ -144,7 +144,8 @@ hru_lc_zonal<-function(classname,daname,shp,fun='mean',field=NULL,plot=T){
   print(raster::unique(class))
   if(plot){
     nclass<-raster::unique(class)
-    print(table(matrix(class)))
+    print("percentage for each lc")
+    print(round(table(matrix(class))/sum(table(matrix(class)))*100,2))
     plot(class)
     plot(da[[1]],add=T,alpha=0.5)
     plot(shp,add=T)
@@ -155,10 +156,11 @@ hru_lc_zonal<-function(classname,daname,shp,fun='mean',field=NULL,plot=T){
     #print(i)
     polygon1<-shp[i,]
     class1<-crop(class,polygon1)
-    polygon1<-spTransform(polygon1,crs(da))
+    if (!compareCRS(polygon1,da)) polygon1<-spTransform(polygon1,crs(da))
     da1<-crop(da,polygon1)
+    if (!compareCRS(polygon1,class1)) polygon1<-spTransform(polygon1,crs(class1))
     polygon1<-spTransform(polygon1,crs(class1))
-    da1<-projectRaster(da1,class1,method='ngb')
+    if (res(class1)!=res(da1) | !compareCRS(da1,class1)) da1<-projectRaster(da1,class1,method='ngb')
     class1<-raster::mask(class1,polygon1)
     da1<-raster::mask(da1,polygon1)
     if(sum(unique(class1))<1){
@@ -255,7 +257,6 @@ f_landlai<-function(lcfname,laifname,Basins,byfield,yr.start){
     }
     a
   }
-  dates<-seq(as.Date(paste0(yr.start,"-01-01")),by="1 year",length.out = dim(da)[3])
   ha<-lapply(hru_lai, f_fillmatix,lcs)
   hru_lais<-do.call(rbind,ha)
   hru_lais<-cbind("BasinID"=rep(as.integer(names(hru_lai)),each=length(hru_lai[[1]][,1])),
@@ -313,7 +314,7 @@ f_soilinfo<-function(soilfname,Basins){
 }
 
 f_crop_roi<-function(da,roi_shp,plot=T){
-  roi_shp<-spTransform(roi_shp,crs(da))
+  if (!compareCRS(roi_shp,da))  roi_shp<-spTransform(roi_shp,crs(da))
   da<-crop(da,roi_shp)
   da<-mask(da,roi_shp)
   if(plot) plot(da[[1]]);plot(roi_shp,add=T)
@@ -421,6 +422,6 @@ hrurouting<-function(Flwdata,routpar,mc_cores=1){
 }
 
 
-librs<-c("dplyr","raster","ggplot2","leaflet","rgdal","rgeos","leaflet.extras","parallel")
+librs<-c("dplyr","raster","ggplot2","leaflet","rgdal","rgeos","leaflet.extras","parallel","shinyFiles")
 f_lib_check(librs)
 
