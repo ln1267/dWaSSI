@@ -58,18 +58,22 @@ shinyUI(
                       "),
                  fileInput('Input_basin', 'Choose watershed shapefile', multiple=FALSE, accept="gml"),
 
+
                  # Action: Plot basin ----
-                 actionButton("processrasters","process input"),
+                 actionButton("processrasters","process input!"),
                  # Action: Process input ----
-                 actionButton("plotrasterdata","Plot the input rasters!"),
+                 actionButton("plotrasterdata","Plot the input data!"),
                  #h2("Upload all original raster files"),
-                 HTML("<p>Please chose a '*.tif' or '*.nc' monthly stacked precipitation and temperation file to upload.</p>
+                  HTML("<p>Please chose a '*.tif' or '*.nc' monthly stacked precipitation and temperation file to upload.</p>
                       "),
+
                  fileInput('Input_dem_raster', 'Choose elevation raster file', multiple=FALSE, accept="tif"),
-                 fileInput('Input_temp_raster', 'Choose temperature raster file', multiple=FALSE, accept="tif"),
-                 fileInput('Input_precp_raster', 'Choose precipitation raster file', multiple=FALSE, accept="tif"),
                  fileInput('Input_lc_raster', 'Choose land cover raster file', multiple=FALSE, accept="tif"),
-                 fileInput('Input_lai_raster', 'Choose LAI raster file', multiple=FALSE, accept="tif"),
+                 textInput("yearStartClimate", "Start year of climate data","2000"),
+                 fileInput('Input_temp_raster', 'Choose monthly temperature raster file', multiple=FALSE, accept="tif"),
+                 fileInput('Input_precp_raster', 'Choose monthly precipitation raster file', multiple=FALSE, accept="tif"),
+                 textInput("yearStartLai", "Start year of Lai data","2000"),
+                 fileInput('Input_lai_raster', 'Choose monthly LAI raster file', multiple=FALSE, accept="tif"),
                  fileInput('Input_soil_raster', 'Choose Soil raster file', multiple=FALSE, accept="tif"),
                  fileInput('Input_imp_raster', 'Choose impverious raster file [Optional]', multiple=FALSE, accept="tif")
 
