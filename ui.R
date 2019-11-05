@@ -163,7 +163,7 @@ shinyUI(
                  dateRangeInput("dateSimulation","Select the date range for simulation"),
 
                  # Action: Subset data ----
-                 actionButton("subSimData","Subset the selected dataset"),
+                 #actionButton("subSimData","Subset the selected dataset"),
 
                  # Input: Simulation period
                  #sliderInput("dateSimulation", "Year simulation", 1970, 2017, value = c(2000, 2010)),
@@ -188,13 +188,13 @@ shinyUI(
                   checkboxGroupInput("plotvars","Select the variables to plot",c("P","T","Q"),inline = T),
 
                   # Input: Year for plotting ---
-                  sliderInput("plotdaterange", "Year plot", 1970, 2017, value = c(2000, 2010)),
+                  sliderInput("plotSimDaterange", "Year plot", 1970, 2017, value = c(2000, 2010)),
 
                   # Action: Plot simulated result ---
-                   actionButton("plotres","Plot"),
+                   actionButton("plotSimOut","Plot"),
 
                   # Output: ploted simulated result
-                   plotOutput("plotresout")
+                   plotOutput("plotSimOut")
                  )
               )
         ),
