@@ -478,9 +478,30 @@ shinyServer(function(input, output,session) {
   ## Action: Subset data by Station ID and period----
   observeEvent(input$runSimulation, {
     inforprint$simulating<-"Processing log:"
-    Sim_dates[["Start"]]<<-as.Date(paste0(format(input$dateSimulation[1],"%Y"),"-01-01"))
-    Sim_dates[["End"]]<<-as.Date(paste0(format(input$dateSimulation[2],"%Y"),"-12-01"))
+
+    Sim_dates[["Start"]]<<-input$dateSimulation[1]
+    Sim_dates[["End"]]<<-input$dateSimulation[2]
+    # Only use year of the input
+    # Sim_dates[["Start"]]<<-as.Date(paste0(format(input$dateSimulation[1],"%Y"),"-01-01"))
+    # Sim_dates[["End"]]<<-as.Date(paste0(format(input$dateSimulation[2],"%Y"),"-12-01"))
+    Sim_dates[["Seq_date"]]<-seq.Date((Sim_dates[["Start"]]-years(warmup)),Sim_dates[["End"]],by = "month")
+
+    climate_sel<-data_input[["Climate"]]%>%
+      filter(BasinID==1)%>%
+      mutate(Date=as.Date(paste0(Year,"-",Month,"-","01")))
+    daterange_climate<-range(climate_sel$Date)
+    # Check the input dataset
+    if(daterange_climate[1]>Sim_dates[["Start"]] | daterange_climate[2]< Sim_dates[["End"]]){
+      f_addinfo("simulating",paste0("!!! ERROR: You can select simulation data
+      for the period of ",paste(range(climate_sel$Date),collapse="-")))
+      return()
+    }
+
+    # Climate time range
+    Sim_dates[["Start_climate"]] <<- daterange_climate[1]
+    Sim_dates[["End_climate"]] <<- daterange_climate[2]
     Sim_dates[["Seq_date"]]<<-seq.Date(Sim_dates[["Start"]],Sim_dates[["End"]],by = "month")
+    Sim_dates[["Seq_date_climate"]]<<-seq.Date(Sim_dates[["Start_climate"]],Sim_dates[["End_climate"]],by = "month")
 
     StationID<-as.integer(input$StationID)
     if(StationID==0) {
@@ -498,8 +519,31 @@ shinyServer(function(input, output,session) {
 
     NoBasins<-length(BasinID_sel)
 
+    # process climate data
+
+    # Testing whether climate data have enough data for warmingup
+    if ((Sim_dates[["Start"]]-years(warmup))<Sim_dates[["Start_climate"]]){
+
+      # Gapfill climate data for warming up
+
+
+    }else{
+      climate_sel<-data_input[["Climate"]]%>%
+        filter(BasinID %in% BasinID_sel)%>%
+        mutate(Date=as.Date(paste0(Year,"-",Month,"-","01")))%>%
+        filter(Date>=(Sim_dates[["Start"]]-years(warmup)) & Date <=Sim_dates[["End"]])
+    }
+
+#
+#     clim_prcp<-matrix(data_input[["Climate"]]$Ppt_mm,ncol=NoBasins)
+#     data_simulation[["clim_prcp"]]<<-clim_prcp
+#     clim_tavg<-matrix(data_input[["Climate"]]$Tavg_C,ncol=NoBasins)
+#     data_simulation[["clim_tavg"]]<<-clim_tavg
+
+    f_addinfo("simulating","Finished subsetting Climate")
+
     # process soilinfo
-print("process soil")
+    print("process soil")
     par_sacsma<-data_input[["Soilinfo"]]%>%
       as.data.frame()%>%
       filter(BasinID %in% BasinID_sel)%>%
@@ -508,30 +552,6 @@ print("process soil")
     colnames(par_sacsma)<-toupper(colnames(par_sacsma))
     data_simulation[["par_sacsma"]]<<-par_sacsma
     f_addinfo("simulating","Finished subsetting soilinfo")
-
-    # process climate data
-    climate_sel<-data_input[["Climate"]]%>%
-      filter(BasinID %in% BasinID_sel)%>%
-      mutate(Date=as.Date(paste0(Year,"-",Month,"-","01")))%>%
-      filter(Date>=Sim_dates[["Start"]] & Date<=Sim_dates[["End"]])
-    if(nrow(climate_sel)<(12*NoBasins)){
-      f_addinfo("simulating",paste0("!!! ERROR: Not enough climate data
-      in the selected period, you can select Climate data
-      for the period of ",paste(range(data_input[["Climate"]]$Year),collapse="-")))
-      return()
-      }
-    # Climate time range
-    Sim_dates[["Start_climate"]] <<- as.Date(paste0(min(data_input[["Climate"]]$Year),"/01/01"))
-    Sim_dates[["End_climate"]] <<- as.Date(paste0(max(data_input[["Climate"]]$Year),"/12/01"))
-    Sim_dates[["Seq_date_climate"]]<<-seq.Date(Sim_dates[["Start_climate"]],Sim_dates[["End_climate"]],by = "month")
-    Sim_dates[["Sim_ind"]] <<-which(Sim_dates[["Seq_date_climate"]] %in% Sim_dates[["Seq_date"]])
-
-    clim_prcp<-matrix(data_input[["Climate"]]$Ppt_mm,ncol=NoBasins)
-    data_simulation[["clim_prcp"]]<<-clim_prcp
-    clim_tavg<-matrix(data_input[["Climate"]]$Tavg_C,ncol=NoBasins)
-    data_simulation[["clim_tavg"]]<<-clim_tavg
-
-    f_addinfo("simulating","Finished subsetting Climate")
 
     ## Input LAI and ratio for each vegetation type
     huc_lc_ratio<-data_input[["Cellinfo"]]%>%

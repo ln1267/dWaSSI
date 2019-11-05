@@ -62,6 +62,7 @@ shinyUI(
                  actionButton("processrasters","process input!"),
                  # Action: Process input ----
                  actionButton("plotrasterdata","Plot the input data!"),
+                 actionButton("saveInputData","Save the input data!"),
                  #h2("Upload all original raster files"),
                   HTML("<p>Please chose a '*.tif' or '*.nc' monthly stacked precipitation and temperation file to upload.</p>
                       "),
@@ -155,8 +156,7 @@ shinyUI(
                  ## HTML: Introduction ----
 
                  ## Input: Select a Station ----
-                 textInput("StationID", "Type the BasinID of the hydrologic station!","0"
-                 ),
+                 textInput("StationID", "Type the BasinID of the hydrologic station!","0"),
                  fileInput('Input_routpar', 'Choose flow routing parameter file (Optional)', multiple=FALSE, accept="csv"),
                  fileInput('Input_ETmodel', 'Choose your ET model file (Optional)', multiple=FALSE, accept="csv"),
                  fileInput('Input_WUEmodel', 'Choose your WUE model file (Optional)', multiple=FALSE, accept="csv"),
@@ -187,7 +187,7 @@ shinyUI(
 
                   # Input: Year for plotting ---
                   sliderInput("plotSimDaterange", "Year plot", 1970, 2017, value = c(2000, 2010)),
-
+                  textInput("plotSimuBasinID", "Type the BasinID for plotting!","0"),
                   # Action: Plot simulated result ---
                    actionButton("plotSimOut","Plot"),
 
