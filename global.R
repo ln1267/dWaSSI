@@ -374,7 +374,7 @@ f_stream_level_pete<-function(streamfile=NA,mc_cores=1){
   return(stream_level)
 }
 
-f_upstreamHUCs<-function(BasinID){
+f_upstreamHUCs<-function(BasinID,routpar){
   level_to<-routpar$LEVEL[routpar$TO==BasinID]
   upids<-NA
   To<-BasinID
@@ -385,7 +385,7 @@ f_upstreamHUCs<-function(BasinID){
 
       upids<-c(upids,FROM_HUCs)
 
-      TO<-routpar$FROM[routpar$TO %in% To]
+      To<-routpar$FROM[routpar$TO %in% To]
 
       level_to<-routpar$LEVEL[routpar$TO %in% To]
 
@@ -426,6 +426,6 @@ hrurouting<-function(Flwdata,routpar,mc_cores=1){
 librs<-c("dplyr","raster","ggplot2","leaflet","rgdal","rgeos","leaflet.extras","parallel","shinyFiles")
 f_lib_check(librs)
 
-data_input<-list()
+#data_input<-list()
 Ning<-"Ning Liu"
 
