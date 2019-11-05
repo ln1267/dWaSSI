@@ -157,6 +157,7 @@ shinyUI(
                  ## Input: Select a Station ----
                  textInput("StationID", "Type the BasinID of the hydrologic station!","0"
                  ),
+                 fileInput('Input_routpar', 'Choose flow routing parameter file (Optional)', multiple=FALSE, accept="csv"),
 
                  # # Input: Time range for subsetting ----
                  dateRangeInput("dateSimulation","Select the date range for simulation"),
@@ -166,13 +167,16 @@ shinyUI(
 
                  # Input: Simulation period
                  #sliderInput("dateSimulation", "Year simulation", 1970, 2017, value = c(2000, 2010)),
+                 fileInput('Input_ETmodel', 'Choose your ET model file (Optional)', multiple=FALSE, accept="csv"),
+                 fileInput('Input_WUEmodel', 'Choose your WUE model file (Optional)', multiple=FALSE, accept="csv"),
+
                  # Input: Checkbox if calibate model ----
                  checkboxInput("Calibration", "Calibration", FALSE),
                  ## Action: run model
                  actionButton("runSimulation","Run Simulation"),
                  tags$hr(),
                  tags$h5("Simulation log:"),
-                 verbatimTextOutput("simulating")
+                 verbatimTextOutput("printsimulatinginfo")
                   ),
 
                  # Mainpanel: of Simulation----

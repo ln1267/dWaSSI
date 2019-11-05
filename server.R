@@ -451,150 +451,103 @@ shinyServer(function(input, output,session) {
       })
   })
   # Tab: simulation----
-  # Sidepanel: ----
+  ## Print: Print the simulation infor ----
+  output$printsimulatinginfo<-renderPrint({
+
+    if(!is.null(inforprint$simulating)) writeLines(inforprint$simulating)
+  })
+
   ## Action: Subset data by Station ID and period----
-  observeEvent(input$subdata, {
+  observeEvent(input$subSimData, {
+    inforprint$simulating<-"Processing log:"
+    SimStart<-input$dateSimulation[1]
+    SimEnd<-input$dateSimulation[2]
+    StationID<-as.integer(input$StationID)
+    if(StationID==0) {
+      BasinID_sel <- data_input[["Cellinfo"]]$BasinID
+      f_addinfo("simulating","No Station is provided, so that all HUCs are used in the simulation!")
+    }else if(is.null(input$Input_routpar)){
+      f_addinfo("simulating","!!! ERROR: Flow routing file is not provided!")
+      return()
+    }else{
+      f_addinfo("simulating","Only upstreams of the station are selected for the simulation!")
+       routpar<-read.csv(input$Input_routpar$datapath)
+       BasinID_sel<-f_upstreamHUCs(BasinID =StationID ,routpar=routpar)
+       BasinID_sel<-c(BasinID_sel,StationID)
+      }
+
     NoBasins<-length(BasinID_sel)
 
     # process soilinfo
+print("process soil")
     par_sacsma<-data_input[["Soilinfo"]]%>%
+      as.data.frame()%>%
       filter(BasinID %in% BasinID_sel)%>%
       dplyr::select(-BasinID)%>%
       as.matrix()
     colnames(par_sacsma)<-toupper(colnames(par_sacsma))
+    data_simulation[["par_sacsma"]]<<-par_sacsma
+    f_addinfo("simulating","Finished subsetting soilinfo")
 
     # process climate data
-    clim_prcp<-data_input[["Climate"]]%>%
+    climate_sel<-data_input[["Climate"]]%>%
       filter(BasinID %in% BasinID_sel)%>%
       mutate(Date=as.Date(paste0(Year,"-",Month,"-","01")))%>%
-      filter(Date>=SimStart & Date<=SimEnd)%>%
-      dplyr::select(Ppt_mm)%>%
-      matrix(Climate$Tavg_C,ncol=NoBasins)
-    clim_tavg<-data_input[["Climate"]]%>%
-      filter(BasinID %in% BasinID_sel)%>%
-      mutate(Date=as.Date(paste0(Year,"-",Month,"-","01")))%>%
-      filter(Date>=SimStart & Date<=SimEnd)%>%
-      dplyr::select(Tavg_C)%>%
-      matrix(Climate$Tavg_C,ncol=NoBasins)
+      filter(Date>=SimStart & Date<=SimEnd)
+    if(nrow(climate_sel)<(12*NoBasins)){
+      f_addinfo("simulating",paste0("!!! ERROR: Not enough climate data
+      in the selected period, you can select Climate data
+      for the period of ",paste(range(data_input[["Climate"]]$Year),collapse="-")))
+      return()
+      }
 
+    data_simulation[["clim_prcp"]]<<-matrix(climate_sel$Ppt_mm,ncol=NoBasins)
+
+    data_simulation[["clim_tavg"]]<<-matrix(climate_sel$Tavg_C,ncol=NoBasins)
+    f_addinfo("simulating","Finished subsetting Climate")
 
     ## PET parameters
     par_petHamon = rep(1,NoBasins)
 
-
     ## Input LAI and ratio for each vegetation type
     huc_lc_ratio<-data_input[["Cellinfo"]]%>%
       filter(BasinID %in% BasinID_sel)%>%
-      dplyr::select(BasinID:Elev_m)%>%
+      dplyr::select(starts_with("Lc_"))%>%
       as.matrix()
+    # mutate(Date=as.Date(paste0(Year,"-",Month,"-","01")))%>%
+    #   filter(Date>=SimStart & Date<=SimEnd)
     hru_lc_lai<-lapply(BasinID_sel, function(x) as.matrix(subset(data_input[["LAI"]],BasinID==x)[c(4:length(data_input[["LAI"]][1,]))]))
+    data_simulation[["huc_lc_ratio"]]<<-huc_lc_ratio
+    data_simulation[["hru_lc_lai"]]<<-hru_lc_lai
+     f_addinfo("simulating","Finished subsetting laiinfo")
 
-    ## Hru info like Lat, long and elevation for each HUC
+     ## Hru info like Lat, long and elevation for each HUC
     hru_info<-data_input[["Cellinfo"]]%>%
       filter(BasinID %in% BasinID_sel)%>%
       dplyr::select(one_of("BasinID","Latitude","Area_m2","Elev_m","FlwLen_m"))
-    if("Elev_m" %in% names(hru_info)) hru_info["Elev_m"]<-1000
-    if("FlwLen_m" %in% names(hru_info)) hru_info["FlwLen_m"]<-1000
+    if(!"Elev_m" %in% names(hru_info)) hru_info["Elev_m"]<-1000
+    if(!"FlwLen_m" %in% names(hru_info)) hru_info["FlwLen_m"]<-1000
+    data_simulation[["hru_info"]]<<-as.matrix(hru_info)
+    f_addinfo("simulating","Finished processing cellinfo")
 
-    output$subsetdata<-renderText({
-       print("Subseting data has started, please wait .....")
-       f_subset(input$StationID,input$subsetdaterange,input$uploadfilename)
-    })
-  })
-  ## output$uploadfilename:Select a uploaded file for subsetting----
-  output$uploadfilename <- renderUI({
-    # If missing input, return to avoid error later in function
-    if(is.null(input$files)){
-      uploadedfiles<-"test.csv"
-    }else{
-      uploadedfiles <-dir("tmp/",'.csv')[-which(dir("tmp/",'.csv')=="test.csv")]
+    # Load coefficients for SUN's ET and carbon calculation
+    if(! is.null(input$Input_ETmodel)) {
+      ET_coefs<-read.csv(input$Input_ETmodel$datapath)
+      names(ET_coefs)<-c("LC_ID","Intercept","P_coef","PET_coef","LAI_coef","P_PET_coef","P_LAI_coef","PET_LAI_coef","IGBP","LC_Name")
+      data_simulation[["ET_coefs"]]<<-ET_coefs
+      f_addinfo("simulating","User defined ET model is read.")
+      }
+    if(! is.null(input$Input_WUEmodel)) {
+      WUE_coefs<-read.csv(input$Input_ETmodel$datapath)
+      names(WUE_coefs)<-c("LC_ID","WUE","RECO_Intercept", "RECO_Slope","IGBP","LC_Name")
+      data_simulation[["WUE_coefs"]]<<-WUE_coefs
+      f_addinfo("simulating","User defined WUE model is read.")
     }
 
-    # Create the checkboxes and select them all by default
-    selectInput("uploadfilename", "Select the upload filename for simulation",
-                choices  = uploadedfiles,
-                selected = "test.csv"
-    )
   })
 
-
-  ## Action: Subset data by Station ID and period----
-  observeEvent(input$subdata, # subsetting input data
-               output$subsetdata<-renderText({
-                 print("Subseting data has started, please wait .....")
-                 f_subset(input$StationID,input$subsetdaterange,input$uploadfilename)
-                 })
-  )
-
-  ## Action: Print the input data info ----
-  observeEvent(input$printinfo,
-               output$inputfilesummary<-renderPrint({
-                 if(!file.exists(paste0("www/",input$inputfiles,".csv"))) return(print(paste0("There is no ", input$inputfiles," input")))
-                 df<-read.csv(paste0("www/",input$inputfiles,".csv"),sep=",",stringsAsFactors = F)
-                 if("Timestamp" %in% names(df)) df$Timestamp<-as.Date(df$Timestamp,format="%Y-%m-%d")
-                 print("Summary informaiton")
-                 print(summary(df))
-                 print("Header informaiton")
-                 print(head(df))
-                 print("Tailer informaiton")
-                 print(tail(df))
-               })
-
-  )
-
-  ## Mainpanel: ----
-  ## Action: Merge climate and lai data ----
-  observeEvent(input$mergeinput,
-               output$mergeinputout<-renderPrint({
-                 f_merge_input()
-               })
-  )
-  ## Action: Calculate WUE based on vegetation ratio ----
-  observeEvent(input$calwue,
-               output$wues<-renderPrint({
-                 if(!file.exists(paste0("www/LUCC.csv"))) return(print("There is no Landcover input"))
-                 vegratio<-read.csv("www/LUCC.csv",sep=",",stringsAsFactors = F)
-                 f_WaSSI_WUE(vegratio)
-               })
-  )
-
-  ## Action: Calculate ET based on SUN ET function ----
-  observeEvent(input$calsunET,
-               output$ETs<-renderPrint({
-                 if(!file.exists(paste0("www/LUCC.csv"))) return(print("There is no Landcover input"))
-                 vegratio<-read.csv("www/LUCC.csv",sep=",",stringsAsFactors = F)
-                 wues<-f_WaSSI_WUE(vegratio)
-                 if(!file.exists(paste0("www/pars.csv"))) return(print("There is no pars input"))
-                 print("Calculating monthly ET based on SUN's function")
-                 pars<-read.csv("www/pars.csv",header = T)
-                 pars<-c("LAT"=pars$LAT,"LONG"=pars$LONG,"ALT"=pars$ALT,wues)
-                 print(pars)
-                 load("www/data_TS.Rdata")
-                 ET<-f_SUN_ET(data_TS,pars)
-                 save(ET,file = "www/ET.RData")
-               })
-  )
-
-  ## Action: Transfer monthly input to daily input ----
-  observeEvent(input$mon2day,
-               output$mon2dayout<-renderPrint({
-                 load("www/ET.RData")
-                 data_TS_daily<-month2daily(ET,fields = c("P","Q","PET","E"),ts = T)
-                 save(data_TS_daily,file="www/data_TS_daily.RData")
-               })
-  )
-
-  ## Action: Calculate snow ----
-  observeEvent(input$calsnow,
-               output$calsnowout<-renderPrint({
-                 load("www/data_TS_daily.RData")
-                 snow_out<-f_snow_calculation(data_daily)
-                 save(snow_out,file="www/snow_out.RData")
-               })
-  )
-
   ## Action: Run model ----
-  observeEvent(input$runmodel,
+  observeEvent(input$runSimulation,{
                output$ning2<-renderPrint({
                  print("Simulation has started, please wait .....")
                  load("www/data_TS_daily.RData")
@@ -614,7 +567,7 @@ shinyServer(function(input, output,session) {
                                  )
                  save(outp,file="www/outp.RData")
                  })
-  )
+  })
 
   ## Action: Plot the basic result----
   observeEvent(input$plotres,{
