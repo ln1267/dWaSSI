@@ -458,10 +458,12 @@ shinyServer(function(input, output,session) {
   })
 
   ## Action: Subset data by Station ID and period----
-  observeEvent(input$subSimData, {
+  observeEvent(input$runSimulation, {
     inforprint$simulating<-"Processing log:"
-    SimStart<-input$dateSimulation[1]
-    SimEnd<-input$dateSimulation[2]
+    Sim_dates[["Start"]]<<-as.Date(paste0(format(input$dateSimulation[1],"%Y"),"-01-01"))
+    Sim_dates[["End"]]<<-as.Date(paste0(format(input$dateSimulation[2],"%Y"),"-12-01"))
+    Sim_dates[["Seq_date"]]<<-seq.Date(Sim_dates[["Start"]],Sim_dates[["End"]],by = "month")
+
     StationID<-as.integer(input$StationID)
     if(StationID==0) {
       BasinID_sel <- data_input[["Cellinfo"]]$BasinID
@@ -493,21 +495,25 @@ print("process soil")
     climate_sel<-data_input[["Climate"]]%>%
       filter(BasinID %in% BasinID_sel)%>%
       mutate(Date=as.Date(paste0(Year,"-",Month,"-","01")))%>%
-      filter(Date>=SimStart & Date<=SimEnd)
+      filter(Date>=Sim_dates[["Start"]] & Date<=Sim_dates[["End"]])
     if(nrow(climate_sel)<(12*NoBasins)){
       f_addinfo("simulating",paste0("!!! ERROR: Not enough climate data
       in the selected period, you can select Climate data
       for the period of ",paste(range(data_input[["Climate"]]$Year),collapse="-")))
       return()
       }
+    # Climate time range
+    Sim_dates[["Start_climate"]] <<- as.Date(paste0(min(data_input[["Climate"]]$Year),"/01/01"))
+    Sim_dates[["End_climate"]] <<- as.Date(paste0(max(data_input[["Climate"]]$Year),"/12/01"))
+    Sim_dates[["Seq_date_climate"]]<<-seq.Date(Sim_dates[["Start_climate"]],Sim_dates[["End_climate"]],by = "month")
+    Sim_dates[["Sim_ind"]] <<-which(Sim_dates[["Seq_date_climate"]] %in% Sim_dates[["Seq_date"]])
 
-    data_simulation[["clim_prcp"]]<<-matrix(climate_sel$Ppt_mm,ncol=NoBasins)
+    clim_prcp<-matrix(data_input[["Climate"]]$Ppt_mm,ncol=NoBasins)
+    data_simulation[["clim_prcp"]]<<-clim_prcp
+    clim_tavg<-matrix(data_input[["Climate"]]$Tavg_C,ncol=NoBasins)
+    data_simulation[["clim_tavg"]]<<-clim_tavg
 
-    data_simulation[["clim_tavg"]]<<-matrix(climate_sel$Tavg_C,ncol=NoBasins)
     f_addinfo("simulating","Finished subsetting Climate")
-
-    ## PET parameters
-    par_petHamon = rep(1,NoBasins)
 
     ## Input LAI and ratio for each vegetation type
     huc_lc_ratio<-data_input[["Cellinfo"]]%>%
@@ -517,6 +523,10 @@ print("process soil")
     # mutate(Date=as.Date(paste0(Year,"-",Month,"-","01")))%>%
     #   filter(Date>=SimStart & Date<=SimEnd)
     hru_lc_lai<-lapply(BasinID_sel, function(x) as.matrix(subset(data_input[["LAI"]],BasinID==x)[c(4:length(data_input[["LAI"]][1,]))]))
+    # LAI time range
+    Sim_dates[["Start_lai"]] <<- as.Date(paste0(min(data_input[["LAI"]]$Year),"/01/01") )
+    Sim_dates[["End_lai"]] <<- as.Date(paste0(max(data_input[["LAI"]]$Year),"/12/01"))
+
     data_simulation[["huc_lc_ratio"]]<<-huc_lc_ratio
     data_simulation[["hru_lc_lai"]]<<-hru_lc_lai
      f_addinfo("simulating","Finished subsetting laiinfo")
@@ -531,46 +541,65 @@ print("process soil")
     f_addinfo("simulating","Finished processing cellinfo")
 
     # Load coefficients for SUN's ET and carbon calculation
+    ET_coefs<-NULL
+    WUE_coefs<-NULL
     if(! is.null(input$Input_ETmodel)) {
-      ET_coefs<-read.csv(input$Input_ETmodel$datapath)
+      ET_coefs<-read.csv(input$Input_ETmodel$datapath,nrows = length(huc_lc_ratio[1,]))
       names(ET_coefs)<-c("LC_ID","Intercept","P_coef","PET_coef","LAI_coef","P_PET_coef","P_LAI_coef","PET_LAI_coef","IGBP","LC_Name")
       data_simulation[["ET_coefs"]]<<-ET_coefs
       f_addinfo("simulating","User defined ET model is read.")
       }
     if(! is.null(input$Input_WUEmodel)) {
-      WUE_coefs<-read.csv(input$Input_ETmodel$datapath)
+      WUE_coefs<-read.csv(input$Input_ETmodel$datapath,nrows = length(huc_lc_ratio[1,]))
       names(WUE_coefs)<-c("LC_ID","WUE","RECO_Intercept", "RECO_Slope","IGBP","LC_Name")
       data_simulation[["WUE_coefs"]]<<-WUE_coefs
       f_addinfo("simulating","User defined WUE model is read.")
     }
+    ## PET parameters
+    par_petHamon<- rep(1,NoBasins)
+    print(par_petHamon)
+    # Run the model
+    print(" runing")
+    f_addinfo("simulating","Runing simulation ...")
+    flowR <<- dWaSSIC(sim.dates=Sim_dates, warmup = 2,mcores = 1,
+                     par.sacsma = par_sacsma,par.petHamon=par_petHamon,par.routing =par_routing,
+                     hru.info = hru_info,
+                     clim.prcp = clim_prcp, clim.tavg = clim_tavg,
+                     hru.lai=NULL,hru.lc.lai=hru_lc_lai,huc.lc.ratio=huc_lc_ratio,
+                     WUE.coefs = WUE_coefs,ET.coefs = ET_coefs)
 
-  })
+    print("finished runing")
+
+})
 
   ## Action: Run model ----
-  observeEvent(input$runSimulation,{
-               output$ning2<-renderPrint({
-                 print("Simulation has started, please wait .....")
-                 load("www/data_TS_daily.RData")
-                 soil<-as.vector(read.csv("www/SOIL.csv"))
-                 soil_pars<-list("uztwm" = 1, "uzfwm" = 150, "uzk" = 0.1, "pctim" = 1e-06, "adimp" = 0,
-                                 "zperc" = 28.8997, "rexp" = 5, "lztwm" = 205.652, "lzfsm" = 758.774,
-                                 "lzfpm" = 1000, "lzsk" = 0.149213, "lzpk" = 0.00607691, "pfree" = 0.582714)
-                 soil_pars[names(soil)]<-soil[names(soil)]
+  observeEvent(input$plotSimOut,{
+    out_weight<-lapply(c(1:length(flowR$HUC)),function (x) flowR$HUC[[x]]*data_simulation[["hru_info"]][,"Area_m2"][x]/sum(data_simulation[["hru_info"]][,"Area_m2"]))
+    flowR_Catchment<-as.data.frame(sapply(names(out_weight[[1]]), function(var) apply(sapply(out_weight, function(x) x[[var]]),1,sum)))
 
-                 if(as.integer(format(range(index(data_TS_daily))[1],"%Y"))>input$simulatedaterange[1]) return(print(paste0("The start date should be later than ",range(index(data_TS_daily))[1])))
-                 if(as.integer(format(range(index(data_TS_daily))[2],"%Y"))<input$simulatedaterange[2]) return(print(paste0("The end date should be earler than ",range(index(data_TS_daily))[2])))
+    Rain_mean<-apply(data_simulation[["clim_prcp"]], 1, mean,na.rm=T)
+    df <- data.frame(date = Sim_dates$Seq_date,Srufflow = flowR$FLOW_SURF,
+                     Baseflow=flowR$FLOW_BASE,Totflow=flowR$FLOW_SURF+flowR$FLOW_BASE,
+                     AET=flowR_Catchment$totaet,Rain=Rain_mean[Sim_dates$Sim_ind],
+                     nt=flowR_Catchment$tot)%>%
+      filter(date>=as.Date(paste0(input$plotSimDaterange[1],"/01/01")) & date<=as.Date(paste0(input$plotSimDaterange[2],"/12/01")) )
 
-                 outp<-f_WaSSI_Q(data_TS_daily,soil_pars,
-                                 calibrate =F,
-                                 y_s = input$simulatedaterange[1],
-                                 y_e = input$simulatedaterange[2]
-                                 )
-                 save(outp,file="www/outp.RData")
-                 })
+    output$plotSimOut <- renderPlot({
+      input$plotSimOut
+      df%>%
+        gather(Variable,Value,Srufflow:nt)%>%
+        filter(Variable %in% c("Srufflow","Baseflow","Totflow","Rain"))%>%
+        mutate(Variable=factor(Variable,levels = c("Srufflow","Baseflow","Totflow" , "AET","Rain","nt" ),labels = c("Surface flow","Base flow","Total flow","Actual evpotransipration","Rainfall","nn")))%>%
+        ggplot(aes(x=date,y=Value,col=Variable))+
+        labs(y="(mm/month)")+
+        scale_x_date(date_breaks = "1 year", date_labels = "%Y")+
+        geom_line()+geom_point()+
+        theme_ning(size.axis = 12,size.title =14 )
+    })
   })
 
   ## Action: Plot the basic result----
-  observeEvent(input$plotres,{
+  observeEvent(input$plotresa,{
 
     output$plotresout<-renderPlot({
       req(input$plotvars)

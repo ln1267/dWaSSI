@@ -422,10 +422,189 @@ hrurouting<-function(Flwdata,routpar,mc_cores=1){
   return(water)
 }
 
+#' This function allows you to get the number of days for a specific month.
+#' @param date A date object.
+#' @keywords cats
+#' @export
+#' @examples
+#' date<-as.Date("2001-01-01")
+#' numberOfDays(date)
+numberOfDays <- function(date) {
+  m <- format(date, format="%m")
 
+  while (format(date, format="%m") == m) {
+    date <- date + 1
+  }
+
+  return(as.integer(format(date - 1, format="%d")))
+}
+
+
+# Parallel wrap of WaSSI-C model----
+#' @title Parallel wrap of WaSSI-C model
+#' @description FUNCTION_DESCRIPTION
+#' @param sim.dates  list of all dates
+#' @param warmup years for warming up WaSSI-C model
+#' @param mcores how many cores using for simulation
+#' @param WUE.coefs the input parameters of WUE
+#' @param ET.coefs the input parameter of ET
+#' @return outputs potential evapotranspiration (mm day-1)
+#' @details For details see Haith and Shoemaker (1987)
+#' @examples
+#' \dontrun{
+#' dWaSSIC(sim.dates = sim_dates,
+#'              hru.par = hru_par, hru.info = hru_info, hru.elevband = NULL,
+#'              clim.prcp = stcroix$prcp.grid, clim.tavg = stcroix$tavg.grid,
+#'              snow.flag = 0, progress.bar = TRUE)
+#' }
+#' @rdname dWaSSIC
+#' @export
+#'
+dWaSSIC<- function(sim.dates, warmup=3,mcores=1,
+                   par.sacsma = NULL,par.petHamon=NULL,par.routing=NULL,
+                   hru.info = NULL,
+                   clim.prcp = NULL, clim.tavg = NULL,
+                   hru.lai=NULL,hru.lc.lai=NULL,huc.lc.ratio=NULL,WUE.coefs=NULL,ET.coefs=NULL)
+{
+  require(lubridate)
+  # date vectors
+  sim_date <- seq.Date(sim.dates[["Start"]]-years(warmup), sim.dates[["End"]], by = "month")
+  #jdate <- as.numeric(format(sim_date, "%j"))
+  jdate <-  c(15,46,76,107,137,168,198,229,259,290,321,351)
+  ydate <- as.POSIXlt(sim_date)$year + 1900
+  ddate <- as.POSIXlt(as.Date(paste0(ydate,"/12/31")))$yday + 1
+  days_mon<-sapply (sim_date,numberOfDays)
+
+  # Simulation parameters
+  sim_num  <- length(sim_date)  # number of simulation steps (months)
+  hru_num  <- nrow(hru.info)  # number of HRUs
+  # Extract the sim period from the climate data for each HRU
+  climate_date <- seq.Date(sim.dates[["Start_climate"]], sim.dates[["End_climate"]], by = "month")
+  grid_ind <-which(climate_date %in% sim_date)
+  hru_prcp <- clim.prcp[grid_ind,]
+  hru_tavg <- clim.tavg[grid_ind,]
+
+  # HRU parameters
+  hru_num   <- nrow(hru.info)  # total number of hrus in the watershed
+  hru_lat     <- hru.info$Latitude # Latitude of each HRU (Deg)
+  # hru_lon     <- hru.info$HRU_Lon # Longitude of each HRU (Deg)
+  hru_area<-NULL;hru_elev<-NULL;hru_flowlen<-NULL
+  if("Area_m2" %in% names(hru.info)) hru_area <- hru.info$Area_m2 # Area of each HRU (as %)
+  if("Elev_m" %in% names(hru.info)) hru_elev    <- hru.info$Elev_m # Elevation of each HRU (m)
+  if("FlwLen_m" %in% names(hru.info)) hru_flowlen    <- hru.info$FlwLen_m # Elevation of each HRU (m)
+
+  #get the number of land cover types
+  if (!is.null(huc.lc.ratio)) NLCs<-length(huc.lc.ratio[1,])
+  # WaSSI for each HRU and calculate adjust temp and pet values
+
+  WaSSI<-function(h){
+
+    # Using snowmelt function to calculate effective rainfall
+
+    hru_mrain <- snow_melt(ts.prcp = hru_prcp[,h],ts.temp = hru_tavg[,h],snowrange = c(-5,1))$prcp
+
+    # PET using Hamon equation
+    hru_pet <- hamon(par = par.petHamon[h], tavg = hru_tavg[,h], lat = hru_lat[h], jdate = jdate)
+    hru_pet<-hru_pet*days_mon
+    # Calculate hru flow for each elevation band
+    ## calculate flow for each land cover type
+
+    # if lai data is not enough
+    if(is.null(sim.dates[["Start_lai"]])) str.date.lai<-sim.dates[["Start_climate"]]
+    if(is.null(sim.dates[["End_lai"]])) end.date.lai<-sim.dates[["End_climate"]]
+
+    ## set the first year lai to before
+    if(sim.dates[["Start_lai"]]>sim.dates[["Start"]]-years(warmup)){
+      lack_lai_years<-floor(as.numeric(difftime(sim.dates[["Start_lai"]],sim.dates[["Start"]]-years(warmup),units="days")/365))
+      hru.lc.lai<-lapply(hru.lc.lai,function(x) rbind(apply(x[1:12,],2,rep,lack_lai_years),x))
+      sim.dates[["Start_lai"]]<-sim.dates[["Start"]]-years(warmup)
+    }
+    ## set the last year lai to after
+    if(sim.dates[["End_lai"]]<sim.dates[["End"]]){
+      lack_lai_years<-floor(as.numeric(difftime(sim.dates[["End"]],sim.dates[["End_lai"]],units="days")/365))
+      start1<-length(hru.lc.lai[[1]][,1])-11
+      hru.lc.lai<-lapply(hru.lc.lai,function(x) rbind(x,apply(x[start1:(start1+11),],2,rep,lack_lai_years)))
+      sim.dates[["End_lai"]]<-sim.dates[["End"]]
+    }
+
+    # filter lai data by the simulation date
+    lai_date <- seq.Date(sim.dates[["Start_lai"]], sim.dates[["End_lai"]], by = "month")
+    grid_ind_lai <-which(lai_date %in% sim_date)
+    hru.lc.lai<-lapply(hru.lc.lai,function(x) x[grid_ind_lai,] )
+
+    # Calculate PET based on LAI
+    if(is.null(ET.coefs)){
+      hru_lc_pet<-hru_pet*hru.lc.lai[[h]]*0.0222+0.174*hru_mrain+0.502*hru_pet+5.31*hru.lc.lai[[h]]
+    }else{
+      # Calculate the actual ET based on SUN's ET model
+      hru_lc_pet<-matrix(NA,nrow =length(hru_pet), ncol=NLCs)
+      for (i in c(1:NLCs)){
+        hru_lc_pet[,i]<- ET.coefs[i,"Intercept"] +
+          ET.coefs[i,"P_coef"]*hru_mrain+
+          ET.coefs[i,"PET_coef"]*hru_pet+
+          ET.coefs[i,"LAI_coef"]*hru.lc.lai[[h]][i]+
+          ET.coefs[i,"P_PET_coef"]*hru_mrain*hru_pet +
+          ET.coefs[i,"P_LAI_coef"]*hru_mrain*hru.lc.lai[[h]][i] +
+          ET.coefs[i,"PET_LAI_coef"] *hru_pet*hru.lc.lai[[h]][i]
+      }
+    }
+
+    # calculate flow based on PET and SAC-SMA model
+    hru_lc_out <-apply(hru_lc_pet,2,sacSma_mon,par = par.sacsma[h,], prcp = hru_mrain )
+
+    if(!is.null(WUE.coefs)){
+      # Calculate Carbon based on WUE for each vegetation type
+      for (i in c(1:NLCs)){
+        hru_lc_out[[i]][["GEP"]]<-hru_lc_out[[i]][["totaet"]] *WUE.coefs$WUE[i]
+        hru_lc_out[[i]][["RECO"]]<-WUE.coefs$RECO_Intercept[i] + hru_lc_out[[i]][["GEP"]] *WUE.coefs$RECO_Slope[i]
+        hru_lc_out[[i]][["NEE"]] <-hru_lc_out[[i]][["RECO"]]-hru_lc_out[[i]][["GEP"]]
+      }
+
+    }
+    # Weight each land cover type based on it's ratio
+    hru_out<-lapply(c(1:length(huc.lc.ratio[h,])),function(x) lapply(hru_lc_out[[x]],function(y) huc.lc.ratio[h,x]*y))
+    out<-lapply(names(hru_lc_out[[1]]), function(var) apply(sapply(hru_out, function(x) x[[var]]),1,sum))
+    names(out)<-names(hru_lc_out[[1]])
+
+    return(out)
+  }
+
+  huc_routing<-function(h){
+    out2<-lohamann(par = par.routing[h,], inflow.direct = out[[h]][["surf"]],
+                   inflow.base = out[[h]][["base"]], flowlen = hru_flowlen[h])
+    FLOW_SURF <- out2$surf * hru_area[h] / sum(hru_area)
+    FLOW_BASE <- out2$base * hru_area[h] / sum(hru_area)
+    return(list(surf=FLOW_SURF,base=FLOW_BASE))
+  }
+
+  # get the real simulate period result
+  if(mcores>1){
+    result<-mclapply(c(1:hru_num), WaSSI,mc.cores = mcores)
+  }else{
+    result<-lapply(c(1:hru_num), WaSSI)
+  }
+
+  out<- lapply(result, function(x) as.data.frame(x)[(warmup*12+1):length(x[[1]]),])
+
+  # routing based on catchment area
+  if(is.null(par.routing) | is.null(hru_flowlen) | is.null(hru_area)){
+
+    return(out)
+
+  }else{
+    # Channel flow routing from Lohmann routing model
+    out2 <- mclapply(c(1:hru_num), huc_routing,mc.cores = mcores)
+    out3<-lapply(names(out2[[1]]), function(var) apply(sapply(out2, function(x) x[[var]]),1,sum))
+
+  }
+
+  return(list(FLOW_SURF = out3[[1]], FLOW_BASE=out3[[2]],HUC=out))
+
+}
 librs<-c("dplyr","raster","ggplot2","leaflet","rgdal","rgeos","leaflet.extras","parallel","shinyFiles")
 f_lib_check(librs)
 
-#data_input<-list()
+if(!exists("data_input")) data_input<-list()
 Ning<-"Ning Liu"
-
+if(!exists("data_simulation")) data_simulation<-list()
+if(!exists("Sim_dates")) Sim_dates<-list()
