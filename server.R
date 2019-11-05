@@ -7,7 +7,7 @@ library(shiny)
 
 # Define server logic required to draw a histogram
 shinyServer(function(input, output,session) {
-  options(shiny.maxRequestSize=30*1024^2)
+  options(shiny.maxRequestSize=100*1024^2)
 
   # Define the info printing
   inforprint<-reactiveValues(reading=NULL,
@@ -92,7 +92,7 @@ shinyServer(function(input, output,session) {
 
       # Get the area of each polygon
      if (!is.projected(Basins)){
-       Basins_pro<-spTransform(Basins,CRS("+init=epsg:3857"))
+       Basins_pro<-spTransform(Basins,CRS("+init=epsg:32648"))
        Basins[["Area_m2"]]=round(gArea(Basins_pro,byid = T),2)
      }else{
        Basins[["Area_m2"]]=round(gArea(Basins,byid = T),2)
@@ -126,6 +126,7 @@ shinyServer(function(input, output,session) {
     }else{
 
       f_addinfo("processing","Processing climate data ...")
+      print("Processsing Climate data ...")
       Tmean_catchment<-f_sta_shp_nc(input$Input_temp_raster$datapath,BasinShp,varname = "Tavg_C",yr.start = input$yearStartClimate,zonal_field = "BasinID")
       Pre_catchment<-f_sta_shp_nc(input$Input_precp_raster$datapath,BasinShp,varname = "Ppt_mm",yr.start = input$yearStartClimate,zonal_field = "BasinID")
       climate<-Pre_catchment%>%
@@ -351,6 +352,23 @@ shinyServer(function(input, output,session) {
 
   })
 
+
+  ## SaveAction: save the processed input data  ----
+  observeEvent(input$saveInputData,{
+
+   for (var in  names(data_input)){
+
+      write.csv(data_input[[var]],paste0("www/inputs/",var,".csv"),row.names=F)
+
+   }
+
+    f_addinfo("processing",
+              paste0("The input data (",
+                     paste(names(data_input),collapse = ","),
+                     ") has been save to default foler 'www/inputs'"))
+
+    })
+
   # Tab: Plot input data----
   ## Print: Print the processig infor ----
   output$printplottinginfo<-renderPrint({
@@ -561,13 +579,28 @@ print("process soil")
     # Run the model
     print(" runing")
     f_addinfo("simulating","Runing simulation ...")
-    flowR <<- dWaSSIC(sim.dates=Sim_dates, warmup = 2,mcores = 1,
-                     par.sacsma = par_sacsma,par.petHamon=par_petHamon,par.routing =par_routing,
+    out <- dWaSSIC(sim.dates=Sim_dates, warmup = 2,mcores = 1,
+                     par.sacsma = par_sacsma,par.petHamon=par_petHamon,par.routing =NULL,
                      hru.info = hru_info,
                      clim.prcp = clim_prcp, clim.tavg = clim_tavg,
                      hru.lai=NULL,hru.lc.lai=hru_lc_lai,huc.lc.ratio=huc_lc_ratio,
                      WUE.coefs = WUE_coefs,ET.coefs = ET_coefs)
 
+    # stack data
+    f_merge<-function(output){
+      output%>%
+        mutate(Date=Sim_dates$Seq_date_climate[Sim_dates$Sim_ind])
+    }
+
+    output<- lapply(out[["HUC"]], f_merge)
+    output<- do.call(rbind,output)%>%
+      mutate("BasinID"=rep(BasinID_sel,each=length(Sim_dates$Sim_ind)))%>%
+      mutate(Year=as.integer(format(Date,"%Y")),
+             Month=as.integer(format(Date,"%m")))
+    output_ann<-output%>%
+      group_by(BasinID,Year)%>%
+      dplyr::select(-Month,-Date)%>%
+      summarise_all(.funs = "sum",na.rm=T)
     print("finished runing")
 
 })
