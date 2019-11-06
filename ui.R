@@ -158,6 +158,8 @@ shinyUI(
                  ## Input: Select a Station ----
                  textInput("StationID", "Type the BasinID of the hydrologic station!","0"),
                  fileInput('Input_routpar', 'Choose flow routing parameter file (Optional)', multiple=FALSE, accept="csv"),
+                 selectInput("Input_routingmethod", "Select method for flow routing.",
+                             choices=c("NULL","AreaWeighted","Method1","Method2","Method3")),
                  fileInput('Input_ETmodel', 'Choose your ET model file (Optional)', multiple=FALSE, accept="csv"),
                  fileInput('Input_WUEmodel', 'Choose your WUE model file (Optional)', multiple=FALSE, accept="csv"),
 
@@ -191,9 +193,9 @@ shinyUI(
                   textInput("plotSimuBasinID", "Type the BasinID for plotting!","0"),
                   # Action: Plot simulated result ---
                    actionButton("plotsimOut","Plot"),
-
-                  # Output: ploted simulated result
-                   plotOutput("plotSimOut")
+                  verbatimTextOutput("printsimplotinfo"),
+                    # Output: ploted simulated result
+                   plotOutput("SimOutplot")
                  )
               )
         ),

@@ -13,7 +13,8 @@ shinyServer(function(input, output,session) {
   inforprint<-reactiveValues(reading=NULL,
                             processing="Data process log:",
                             plotting="Plotting log: ",
-                            simulating="Simulationg log: ")
+                            simulating="Simulationg log: ",
+                            simulplotting="Plotting log: ")
   f_addinfo<-function(tab,content=NULL){
     inforprint[[tab]]<<-paste(inforprint[[tab]],content,sep="\n")
   }
@@ -487,16 +488,16 @@ shinyServer(function(input, output,session) {
     if(!is.null(inforprint$simulating)) writeLines(inforprint$simulating)
   })
 
-  ## Action: Subset data by Station ID and period----
+  ## Action: Run model ----
   observeEvent(input$runSimulation, {
     inforprint$simulating<-"Processing log:"
 
-    Sim_dates[["Start"]]<<-input$dateSimulation[1]
-    Sim_dates[["End"]]<<-input$dateSimulation[2]
+    Sim_dates[["Start"]]<<-as.Date(format(input$dateSimulation[1],"%Y-%m-01"))
+    Sim_dates[["End"]]<<-as.Date(format(input$dateSimulation[2],"%Y-%m-01"))
     # Only use year of the input
     # Sim_dates[["Start"]]<<-as.Date(paste0(format(input$dateSimulation[1],"%Y"),"-01-01"))
     # Sim_dates[["End"]]<<-as.Date(paste0(format(input$dateSimulation[2],"%Y"),"-12-01"))
-    Sim_dates[["Seq_date"]]<-seq.Date((Sim_dates[["Start"]]-years(warmup)),Sim_dates[["End"]],by = "month")
+    Sim_dates[["Seq_date"]]<<-seq.Date((Sim_dates[["Start"]]-years(warmup)),Sim_dates[["End"]],by = "month")
 
     climate_sel<-data_input[["Climate"]]%>%
       filter(BasinID==1)%>%
@@ -521,11 +522,13 @@ shinyServer(function(input, output,session) {
     Sim_dates[["Start_lai"]]<<-daterange_lai[1]
     Sim_dates[["End_lai"]]<<-daterange_lai[2]
     Lc_Nos<-length(lai_sel[1,])-4
-    print(Lc_Nos)
+    print(paste0("There are ",Lc_Nos," land cover types."))
 
     data_simulation<<-data_input
     # Select HUCs for simulation
     StationID<-as.integer(input$StationID)
+    routpar<-NULL
+    hru_flowlen<-NULL
     if(StationID==0) {
       BasinID_sel <- data_simulation[["Cellinfo"]]$BasinID
       f_addinfo("simulating","No Station is provided, so that all HUCs are used in the simulation!")
@@ -533,19 +536,24 @@ shinyServer(function(input, output,session) {
       f_addinfo("simulating","!!! ERROR: Flow routing file is not provided!")
       return()
     }else{
-      f_addinfo("simulating","Only upstreams of the station are selected for the simulation!")
        routpar<-f_stream_level_pete(input$Input_routpar$datapath)
        BasinID_sel<-f_upstreamHUCs(BasinID =StationID ,routpar=routpar)
        BasinID_sel<-c(BasinID_sel,StationID)
        ## Subset each file
        data_simulation<<-lapply(data_simulation, function(x) subset(x,BasinID %in% BasinID_sel))
-      }
+
+       f_addinfo("simulating",paste0("There are ",length(BasinID_sel),
+                                    " HRUs in the upstreams of the station are selected for the simulation!"))
+}
+
+    # Update flow_len
+    if("Flwlen_m" %in% names(data_simulation[["Cellinfo"]])) hru_flowlen<-data_simulation[["Cellinfo"]]$Flwlen_m
 
     # get the number of selected HUCs
     NoBasins<-length(BasinID_sel)
 
     # Select climate data for the HRU
-     print("process climate data")
+     print("Processing climate data")
     ## Gapfill climate data for warming up
     if (min(Sim_dates[["Seq_date"]])<Sim_dates[["Start_climate"]]){
 
@@ -574,9 +582,10 @@ shinyServer(function(input, output,session) {
     climate_date <- seq.Date(Sim_dates[["Start_climate"]], Sim_dates[["End_climate"]], by = "month")
     climate_ind <-which(climate_date %in% Sim_dates[["Seq_date"]])
     Sim_dates[["climate_index"]]<<-climate_ind
-    f_addinfo("simulating","Finished subsetting Climate")
+    print("Finished processing climate data")
 
     ## Gapfill LAI data
+    print("Processing LAI")
     if (min(Sim_dates[["Seq_date"]])<Sim_dates[["Start_lai"]] | max(Sim_dates[["Seq_date"]])>Sim_dates[["End_lai"]]){
 
       lai_monthly<-data_simulation[["LAI"]]%>%
@@ -606,6 +615,7 @@ shinyServer(function(input, output,session) {
     lai_date <- seq.Date(Sim_dates[["Start_lai"]], Sim_dates[["End_lai"]], by = "month")
     lai_ind <-which(lai_date %in% Sim_dates[["Seq_date"]])
     Sim_dates[["lai_index"]]<<-lai_ind
+    print("Finished processing LAI")
 
     # date vectors
     jdate_index <- as.numeric(format(Sim_dates[["Seq_date"]], "%m"))
@@ -614,8 +624,9 @@ shinyServer(function(input, output,session) {
     Sim_dates[["dateDays"]]<<-sapply(Sim_dates[["Seq_date"]],numberOfDays)
 
      # Load coefficients for SUN's ET and carbon calculation
-    ET_coefs<-NULL
-    WUE_coefs<-NULL
+    data_simulation[["ET_coefs"]]<<-NULL
+    data_simulation[["WUE_coefs"]]<<-NULL
+    print("Processing ET parameters")
     if(! is.null(input$Input_ETmodel)) {
       ET_coefs<-read.csv(input$Input_ETmodel$datapath,nrows = Lc_Nos)
       names(ET_coefs)<-c("LC_ID","Intercept","P_coef","PET_coef","LAI_coef","P_PET_coef","P_LAI_coef","PET_LAI_coef","IGBP","LC_Name")
@@ -632,18 +643,17 @@ shinyServer(function(input, output,session) {
     ## PET parameters
     par_petHamon<- rep(1,NoBasins)
 
-    print(par_petHamon)
     # Run the model
-    print(" runing")
+    print("runing the simulation")
     f_addinfo("simulating","Runing simulation ...")
 
     # get the real simulate period result
     if(mcores>1){
-      result<-mclapply(c(1:NoBasins), WaSSI,datain=data_simulation,sim.dates=Sim_dates,mc.cores = mcores)
+      result<-mclapply(BasinID_sel, WaSSI,datain=data_simulation,sim.dates=Sim_dates,mc.cores = mcores)
     }else{
-      result<-lapply(c(1:NoBasins), WaSSI,datain=data_simulation,sim.dates=Sim_dates)
+      result<-lapply(BasinID_sel, WaSSI,datain=data_simulation,sim.dates=Sim_dates)
     }
-
+    print("Finished runing the simulation")
 
     # process the result for HUC level
     lc_out<-lapply(result, "[[","lc_output")
@@ -651,77 +661,85 @@ shinyServer(function(input, output,session) {
     lc_out<-lapply(vars, function(x) lapply(lc_out, "[[",x))
     names(lc_out)<-vars
     resultOutput[["lc_output"]]<<-lc_out
+    print("Finished processing the Lc level output")
 
     # process the result for HUC level
     out<-lapply(result, "[[","output")
-    Basin_out<-lapply(names(out[[1]])[-1], function(x) sapply(out, "[[",x))
-    names(Basin_out)<-names(out[[1]])[-1]
+    Basin_out<-lapply(names(out[[1]]), function(x) sapply(out, "[[",x))
+    names(Basin_out)<-names(out[[1]])
     resultOutput[["Basin_output"]]<<-Basin_out
+    print("Finished processing the HUC level output")
 
-    hru_area<-subset(data_simulation[["Cellinfo"]],BasinID %in% BasinID_sel)$Area_m2
     # routing based on catchment area
-    if(is.null(par.routing) | is.null(hru_flowlen)){
-
+    hru_area<-data_simulation[["Cellinfo"]]$Area_m2
+    print("Processing flow routing to the outlet HUC")
+    if(input$Input_routingmethod=="NULL"){
       Station_out<-sapply(Basin_out, function(x) apply(x, 1, weighted.mean,hru_area) )
       Station_out<-round(Station_out,3)%>%
         as.data.frame()%>%
         mutate(Date=seq(Sim_dates$Start,Sim_dates$End,by="month"))
       resultOutput[["Station_output"]]<<-Station_out
 
-    }else{
+      }else if(is.null(routpar) | is.null(hru_flowlen)){
+
+      }else{
       # Channel flow routing from Lohmann routing model
-      out2 <- mclapply(c(1:hru_num), huc_routing,mc.cores = mcores)
+      out2 <- mclapply(BasinID_sel, huc_routing,mc.cores = mcores)
       out3<-lapply(names(out2[[1]]), function(var) apply(sapply(out2, function(x) x[[var]]),1,sum))
 
     }
-
-    print("finished runing")
+    f_addinfo("simulating","Finished simulation! ^_^")
+    print("Finished!")
 
 })
 
-  ## Action: Run model ----
+  ## Print: Print the simulation infor ----
+  output$printsimplotinfo<-renderPrint({
+
+    if(!is.null(inforprint$simulplotting)) writeLines(inforprint$simulplotting)
+  })
+  ## PlotAction: Plot model result----
   observeEvent(input$plotsimOut,{
+
+    plot_dates<-c(input$plotSimDaterange[1],input$plotSimDaterange[2])
 
     output<- resultOutput[["Station_output"]]%>%
       mutate(Year=as.integer(format(Date,"%Y")),
              Month=as.integer(format(Date,"%m")))
+    daterange_output<-range(output$Date)
+    # Check the input dataset
+    if(daterange_output[1]>plot_dates[1] | daterange_output[2]<plot_dates[2]){
+      f_addinfo("simulplotting",paste0("!!! ERROR: You can only select the period of ",paste(range(daterange_output),collapse="-")))
+      return()
+    }
+
     output_ann<-output%>%
       group_by(Year)%>%
       dplyr::select(-Month,-Date)%>%
       summarise_all(.funs = "sum",na.rm=T)%>%
       mutate(Date=as.Date(paste0(Year,"-01-01")))
 
-    df <- output%>%
-        filter(Date>=input$plotSimDaterange[1] & Date<=input$plotSimDaterange[2])
-
-    output$plotSimOut <- renderPlot({
-      #input$plotsimOut
-      print(head(df))
-      # df%>%
-      #   gather(Variable,Value,prcp:PET)%>%
-      #   filter(Variable %in% c("flwTot","flwBase","flwSurface","rain","prcp"))%>%
-      #   mutate(Variable=factor(Variable,levels = c("flwTot","flwBase","flwSurface","rain","prcp","aetTot"),
-      #                          labels = c("Total flow","Base flow","Surface flow","Effective rainfall","Precipitation","Actual evpotransipration")))%>%
-      #   ggplot(aes(x=Date,y=Value,col=Variable))+
-      #   labs(y="(mm/month)")+
-      #   scale_x_date(date_breaks = "1 year", date_labels = "%Y")+
-      #   geom_line()+geom_point()+
-      #   theme_ning(size.axis = 12,size.title =14 )
-    })
+    df1 <<- output%>%
+        filter(Date>=plot_dates[1] & Date<=plot_dates[2])
   })
 
   ## Action: Plot the basic result----
-  observeEvent(input$plotresa,{
+  observeEvent(input$plotsimOut,{
 
-    output$plotresout<-renderPlot({
-      req(input$plotvars)
-      load("www/outp.RData")
-      out<-merge(outp$Input,outp$Out)
-      ind<-which(index(out)>= as.POSIXct(paste0(input$plotdaterange[1],"-01-01")) & index(out)<= as.POSIXct(paste0(input$plotdaterange[2],"-12-31")))
-      plot(out[ind,input$plotvars],main = "",xlab = "Time")
-      },
-      height=1000,
-      res = 100)
+    output$SimOutplot <- renderPlot({
+      #input$plotsimOut
+      #print(head(df))
+       df1%>%
+       gather(Variable,Value,prcp:PET)%>%
+       filter(Variable %in% c("flwTot","flwBase","flwSurface","rain","prcp"))%>%
+       mutate(Variable=factor(Variable,levels = c("flwTot","flwBase","flwSurface","rain","prcp","aetTot"),
+                              labels = c("Total flow","Base flow","Surface flow","Effective rainfall","Precipitation","Actual evpotransipration")))%>%
+       ggplot(aes(x=Date,y=Value,col=Variable))+
+       labs(y="(mm/month)")+
+       scale_x_date(date_breaks = "1 year", date_labels = "%Y")+
+       geom_line()+geom_point()+
+       theme_ning(size.axis = 12,size.title =14 )
+    })
   })
 
   ## Action: select time period for calibration and validation----
@@ -746,7 +764,11 @@ WaSSI<-function(hru,datain,sim.dates){
   par.sacsma<-unlist(subset(datain$Soilinfo,BasinID==hru)[-c(1)])
   names(par.sacsma)<-toupper(names(par.sacsma))
   huc.lc.ratio<-unlist(subset(datain$Cellinfo,BasinID==hru)[grep("Lc",names(datain$Cellinfo))])
-  # Using snowmelt function to calculate effective rainfall
+
+  ET.coefs<-datain$ET_coefs
+  WUE.coefs<-datain$WUE_coefs
+
+  # Using snowmelt function to calculate effective rainfall and snowmelt
   snow.result<-snow_melt(ts.prcp = hru_prcp,ts.temp = hru_tavg,snowrange = c(-5,1))
   hru_rain <- snow.result$prcp
 
@@ -760,7 +782,7 @@ WaSSI<-function(hru,datain,sim.dates){
     hru_lc_pet<-hru_pet*hru.lc.lai*0.0222+0.174*hru_rain+0.502*hru_pet+5.31*hru.lc.lai
   }else{
     # Calculate the PET_Sun based on user defined model
-    hru_lc_pet<-matrix(NA,nrow =length(hru_pet), ncol=NLCs)
+    hru_lc_pet<-matrix(NA,nrow =length(hru_pet), ncol=NoLcs)
     for (i in c(1:NoLcs)){
       hru_lc_pet[,i]<- ET.coefs[i,"Intercept"] +
         ET.coefs[i,"P_coef"]*hru_rain+
@@ -793,7 +815,8 @@ WaSSI<-function(hru,datain,sim.dates){
   }
 
   # combin all the input
-  hru_in<-data.frame(Date=sim.dates$Seq_date,prcp=hru_prcp,
+  hru_in<-data.frame(Date=sim.dates$Seq_date,
+                     prcp=hru_prcp,
                      temp = hru_tavg,
                      rain=hru_rain,
                      snowpack=snow.result$snowpack,

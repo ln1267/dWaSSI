@@ -70,7 +70,7 @@ sacSma_mon <- function(pet, prcp,par,ini.states = c(0,0,500,500,500,0)) {
 
     # ET(2), ET from upper zone free water storage
     et2 <- 0
-
+    #print(paste0("I=",i," uztwm= ",uztwm," uztwc= ",uztwc," et1= ", et1, " pr= ",pr," pet= ",edmnd))
     # in case et1 > uztws, no water in the upper tension water storage
     if (uztwc <= 0) {
       et1 <- et1 + uztwc #et1 = uztwc
