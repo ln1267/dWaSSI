@@ -186,10 +186,11 @@ shinyUI(
                   checkboxGroupInput("plotvars","Select the variables to plot",c("P","T","Q"),inline = T),
 
                   # Input: Year for plotting ---
-                  sliderInput("plotSimDaterange", "Year plot", 1970, 2017, value = c(2000, 2010)),
+                  #sliderInput("plotSimDaterange", "Year plot", 1970, 2017, value = c(2000, 2010)),
+                  dateRangeInput("plotSimDaterange","Select the date range for plotting"),
                   textInput("plotSimuBasinID", "Type the BasinID for plotting!","0"),
                   # Action: Plot simulated result ---
-                   actionButton("plotSimOut","Plot"),
+                   actionButton("plotsimOut","Plot"),
 
                   # Output: ploted simulated result
                    plotOutput("plotSimOut")
