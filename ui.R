@@ -9,6 +9,41 @@ library(shiny)
 shinyUI(
   navbarPage(
     "dWaSSIC model",
+    # Tab: About ----
+    tabPanel("About",
+             column(10, wellPanel(
+               #tags$img(src = 'coweeta_logo.jpg',width=600),
+
+              tags$h4("Description"),
+              tags$html("This is the distributed R-based ", tags$b("WaSSI")," model. The original model code is written in Fortran and is publicly accessible. The R version is translated from the Fortran code developed by Peter Caldwell and R code of Sac-sma developed by Umit Taner."),
+              tags$br(),
+              tags$html("The web application for WaSSI allows users to define a custom simulation scenario,
+                        view/download model inputs and outputs in tabular and graphical form for a location of interest,
+                        and view/export model outputs spatially for a variety of time scales using an interactive map viewer.
+                        Users may select their location in the map viewer,
+                        select a specific HUC, or input a zip code to view model inputs and outputs"),
+              tags$hr(),
+              tags$h4("WaSSI"),
+              tags$html("WaSSI is an integrated, process-based model that
+                        can be used to project the effects of forest land cover change,
+                        climate change, and water withdrawals on river flows, water supply stress,
+                        and ecosystem productivity (i.e. carbon dynamics).
+                        WaSSI operates on a monthly time step at the HUC-4 (8-digit HUC)
+                        watershed scale (see more on HUCs) and across Mexico at the 0.5 degree scale.
+                        For the conterminous U.S., the model can also be run at the HUC12
+                        scale for water and carbon balances from 1960 to 2012.
+                        As water yield and carbon sequestration are tightly coupled,
+                        WaSSI can be used to evaluate trade-offs among management strategies for these ecosystem services."),
+              tags$br(),
+              tags$html("Further information is available at: USDA - Forest Service or the Guide"),
+              tags$hr(),
+               h4("Author:"),
+               p("Dr Ning Liu.",p(),a("Email: LN1267@Gmail.com",href="mailto:LN1267@Gmail.com")),
+               h4("Terms:"),
+               p("This app is under the ",a("MIT",href="https://opensource.org/licenses/MIT"),"License.")
+
+             ))
+    ),
     # Tab: Upload data ----
     tabPanel("Upload input data",
              sidebarLayout(
@@ -193,66 +228,29 @@ shinyUI(
                   textInput("plotSimuBasinID", "Type the BasinID for plotting!","0"),
                   # Action: Plot simulated result ---
                    actionButton("plotsimOut","Plot"),
+                  actionButton("savesimOut","Save output"),
                   verbatimTextOutput("printsimplotinfo"),
                     # Output: ploted simulated result
                    plotOutput("SimOutplot")
                  )
               )
         ),
-    navbarMenu("Export result",
-               tabPanel("Export water",
+    # Tab: Help-----
+    tabPanel("Help",
+             column(5, wellPanel(
 
-                        # Sidebar layout with input and output definitions ----
-                        sidebarLayout(
-
-                          # Sidebar panel for inputs ----
-                          sidebarPanel(
-
-                            # Input: Choose dataset ----
-                            selectInput("water", "Choose a dataset:",
-                                        choices = c("rock", "pressure", "cars")),
-
-                            # Button
-                            downloadButton("downloadData", "Download")
-
-                          ),
-
-                          # Main panel for displaying outputs ----
-                          mainPanel(
-
-                            tableOutput("table")
-
-                          )
-                        )
-
+               tags$h4("Instruction for using this app:"),
+               tags$ol(
+                 tags$li("Read the target format input data;"),
+                 tags$li("Process data to the target format from the scratch;"),
+                 tags$li("Plot the input data, if you want;"),
+                 tags$li("Run the simulation and save the result;")
                ),
-               tabPanel("Export Climate",
+               tags$hr(),
+               tags$h4("Framework of dWaSSI model:"),
+               tags$img(src = 'Framework_WaSSIC.png',width=400)
 
-                        # Sidebar layout with input and output definitions ----
-                        sidebarLayout(
-
-                          # Sidebar panel for inputs ----
-                          sidebarPanel(
-
-                            # Input: Choose dataset ----
-                            selectInput("dataset1", "Choose a dataset:",
-                                        choices = c("rock", "pressure", "cars")
-                            ),
-
-                            # Button
-                            downloadButton("downloadData1", "Download")
-
-                          ),
-
-                          # Main panel for displaying outputs ----
-                          mainPanel(
-
-                            tableOutput("table1")
-
-                          )
-                        )
-
-               )
+             ))
     )
   )
 )
