@@ -120,7 +120,7 @@ shinyUI(
                  h2("Select a dataset to plot"),
                  ## Input: Select a file to plot----
                  selectInput("daname2plot", "Name of the dataset.",
-                             choices=c("Climate","LAI")),
+                             choices=c("Climate","LAI","Cellinfo","Soilinfo")),
                  ## Input: Select a variable ----
                  textInput("plotvar", "Type the variable name for ploting","Ppt_mm"),
                  textInput("varnames", "Type the printing name for those variables","Ppt_mm"),
@@ -141,7 +141,7 @@ shinyUI(
                  h2("Plot the selected input dataset!"),
                  tags$html("This is the processing log:"),
                  verbatimTextOutput("printplottinginfo"),
-                 verbatimTextOutput("distPloterror"),
+                 verbatimTextOutput("printbasininfo"),
 
                  plotOutput("Plotinput",height = 800)
                )

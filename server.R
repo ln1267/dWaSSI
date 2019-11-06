@@ -215,6 +215,7 @@ shinyServer(function(input, output,session) {
         Pre_avg<-NULL
         Lai_avg<-NULL
         dem<-NULL
+        lc<-NULL
 
         if(!is.null(input$Input_dem_raster$datapath)){
           print("reading dem")
@@ -399,38 +400,49 @@ shinyServer(function(input, output,session) {
           return()
         }
         f_addinfo("plotting",paste0("Printed BasinID: ",paste(basinids,collapse=",")))
-        df<-data_input[[data2plot]]%>%
-            filter(BasinID %in% basinids)%>%
-            mutate(BasinID=factor(paste0("BasinID = ",BasinID)))%>%
-            filter(Year>=yr.start & Year<=yr.end)%>%
-            filter(Month %in% plotmonths)
-        if(nrow(df)<1) {
-          f_addinfo("plotting","!!! Warning: No data in this time period!")
-          f_addinfo("plotting",paste0("You can plot priod of ",paste(range(data_input[[data2plot]]$Year),collapse = " - ")))
-          return()
-          }else{
-          df<-df%>%
-              mutate(Date=as.Date(paste0(Year,"-",Month,"-","01")))
+
+        if(data2plot %in% c("Cellinfo","Soilinfo")){
+          df<-data_input[[data2plot]]%>%
+            filter(BasinID %in% basinids)
+        }else{
+
+          df<-data_input[[data2plot]]%>%
+              filter(BasinID %in% basinids)%>%
+              mutate(BasinID=factor(paste0("BasinID = ",BasinID)))%>%
+              filter(Year>=yr.start & Year<=yr.end)%>%
+              filter(Month %in% plotmonths)
+          if(nrow(df)<1) {
+            f_addinfo("plotting","!!! Warning: No data in this time period!")
+            f_addinfo("plotting",paste0("You can plot priod of ",paste(range(data_input[[data2plot]]$Year),collapse = " - ")))
+            return()
+            }else{
+            df<-df%>%
+                mutate(Date=as.Date(paste0(Year,"-",Month,"-","01")))
+            }
+
+          # test for LAI data
+          if(data2plot=="LAI" & sum(plotvars %in% names(data_input[[data2plot]]))<1) {
+            f_addinfo("plotting",paste0("!!! Warning: Could not find input variables: ",paste(plotvars,collapse=",")))
+            f_addinfo("plotting",paste0("You can select these variables from LAI data: ",paste(names(data_input[[data2plot]])[-c(1:3)],collapse=",")))
+            return()
+          }else if (data2plot=="LAI" & sum(plotvars %in% names(data_input[[data2plot]]))>=1){
+
+            if(length(plotvarname)!=length(plotvars)) f_addinfo("plotting","!!! Warning: You need to provide the same number of names as the variable.")
+            var_indx<-which(!plotvars %in% names(data_input[[data2plot]]))
+            if(sum(var_indx)>0) {
+              f_addinfo("plotting",paste0("!!! Warning: These variables are not included: ",paste(plotvars[var_indx],collapse=",")))
+              plotvars<-plotvars[-var_indx]
+              plotvarname<-plotvarname[-var_indx]
+
+            }
+            f_addinfo("plotting",paste0("Printed variables: ",paste(plotvars,collapse=",")))
+
           }
-
-        # test for LAI data
-        if(data2plot=="LAI" & sum(plotvars %in% names(data_input[[data2plot]]))<1) {
-          f_addinfo("plotting",paste0("!!! Warning: Could not find input variables: ",paste(plotvars,collapse=",")))
-          f_addinfo("plotting",paste0("You can select these variables from LAI data: ",paste(names(data_input[[data2plot]])[-c(1:3)],collapse=",")))
-          return()
-        }else if (data2plot=="LAI" & sum(plotvars %in% names(data_input[[data2plot]]))>=1){
-
-          if(length(plotvarname)!=length(plotvars)) f_addinfo("plotting","!!! Warning: You need to provide the same number of names as the variable.")
-          var_indx<-which(!plotvars %in% names(data_input[[data2plot]]))
-          if(sum(var_indx)>0) {
-            f_addinfo("plotting",paste0("!!! Warning: These variables are not included: ",paste(plotvars[var_indx],collapse=",")))
-            plotvars<-plotvars[-var_indx]
-            plotvarname<-plotvarname[-var_indx]
-
-          }
-          f_addinfo("plotting",paste0("Printed variables: ",paste(plotvars,collapse=",")))
-
         }
+    output$printbasininfo<-renderPrint({
+
+      if(data2plot %in% c("Cellinfo","Soilinfo")) df
+    })
 
     output$Plotinput <- renderPlot({
         input$plotdata
@@ -508,53 +520,36 @@ shinyServer(function(input, output,session) {
     daterange_lai<-range(lai_sel$Date)
     Sim_dates[["Start_lai"]]<<-daterange_lai[1]
     Sim_dates[["End_lai"]]<<-daterange_lai[2]
+    Lc_Nos<-length(lai_sel[1,])-4
+    print(Lc_Nos)
 
+    data_simulation<<-data_input
     # Select HUCs for simulation
     StationID<-as.integer(input$StationID)
     if(StationID==0) {
-      BasinID_sel <- data_input[["Cellinfo"]]$BasinID
+      BasinID_sel <- data_simulation[["Cellinfo"]]$BasinID
       f_addinfo("simulating","No Station is provided, so that all HUCs are used in the simulation!")
     }else if(is.null(input$Input_routpar)){
       f_addinfo("simulating","!!! ERROR: Flow routing file is not provided!")
       return()
     }else{
       f_addinfo("simulating","Only upstreams of the station are selected for the simulation!")
-       routpar<-read.csv(input$Input_routpar$datapath)
+       routpar<-f_stream_level_pete(input$Input_routpar$datapath)
        BasinID_sel<-f_upstreamHUCs(BasinID =StationID ,routpar=routpar)
        BasinID_sel<-c(BasinID_sel,StationID)
+       ## Subset each file
+       data_simulation<<-lapply(data_simulation, function(x) subset(x,BasinID %in% BasinID_sel))
       }
 
+    # get the number of selected HUCs
     NoBasins<-length(BasinID_sel)
-
-    require(lubridate)
-
-    # Load coefficients for SUN's ET and carbon calculation
-    ET_coefs<-NULL
-    WUE_coefs<-NULL
-    if(! is.null(input$Input_ETmodel)) {
-      ET_coefs<-read.csv(input$Input_ETmodel$datapath,nrows = length(huc_lc_ratio[1,]))
-      names(ET_coefs)<-c("LC_ID","Intercept","P_coef","PET_coef","LAI_coef","P_PET_coef","P_LAI_coef","PET_LAI_coef","IGBP","LC_Name")
-      data_simulation[["ET_coefs"]]<<-ET_coefs
-      f_addinfo("simulating","User defined ET model is read.")
-    }
-    if(! is.null(input$Input_WUEmodel)) {
-      WUE_coefs<-read.csv(input$Input_ETmodel$datapath,nrows = length(huc_lc_ratio[1,]))
-      names(WUE_coefs)<-c("LC_ID","WUE","RECO_Intercept", "RECO_Slope","IGBP","LC_Name")
-      data_simulation[["WUE_coefs"]]<<-WUE_coefs
-      f_addinfo("simulating","User defined WUE model is read.")
-    }
-    ## PET parameters
-    par_petHamon<- rep(1,NoBasins)
-
-    print(par_petHamon)
 
     # Select climate data for the HRU
      print("process climate data")
     ## Gapfill climate data for warming up
     if (min(Sim_dates[["Seq_date"]])<Sim_dates[["Start_climate"]]){
 
-      climate_monthly<-data_input[["Climate"]]%>%
-        filter(BasinID %in% BasinID_sel)%>%
+      climate_monthly<-data_simulation[["Climate"]]%>%
         group_by(BasinID,Month)%>%
         summarise_all(.funs = mean,na.rm=T)%>%
         dplyr::select(-Year)
@@ -567,11 +562,10 @@ shinyServer(function(input, output,session) {
                Month=as.integer(format(Date,"%m")))%>%
         merge(climate_monthly,by=c("BasinID","Month"))%>%
         dplyr::select(BasinID,Year,Month,Ppt_mm,Tavg_C)%>%
-        rbind(data_input[["Climate"]])%>%
-        filter(BasinID %in% BasinID_sel)%>%
+        rbind(data_simulation[["Climate"]])%>%
         arrange(BasinID,Year,Month)
 
-      data_input[["Climate"]]<<-climate_filled
+      data_simulation[["Climate"]]<<-climate_filled
       Sim_dates[["Start_climate"]]<<-(Sim_dates[["Start"]]-years(warmup))
 
     }
@@ -583,11 +577,9 @@ shinyServer(function(input, output,session) {
     f_addinfo("simulating","Finished subsetting Climate")
 
     ## Gapfill LAI data
-
     if (min(Sim_dates[["Seq_date"]])<Sim_dates[["Start_lai"]] | max(Sim_dates[["Seq_date"]])>Sim_dates[["End_lai"]]){
 
-      lai_monthly<-data_input[["LAI"]]%>%
-        filter(BasinID %in% BasinID_sel)%>%
+      lai_monthly<-data_simulation[["LAI"]]%>%
         group_by(BasinID,Month)%>%
         summarise_all(.funs = mean,na.rm=T)%>%
         dplyr::select(-Year)
@@ -601,11 +593,10 @@ shinyServer(function(input, output,session) {
                Month=as.integer(format(Date,"%m")))%>%
         merge(lai_monthly,by=c("BasinID","Month"))%>%
         dplyr::select(BasinID,Year,Month,starts_with("Lc_"))%>%
-        rbind(data_input[["LAI"]])%>%
-        filter(BasinID %in% BasinID_sel)%>%
+        rbind(data_simulation[["LAI"]])%>%
         arrange(BasinID,Year,Month)
 
-      data_input[["LAI"]]<<-LAI_filled
+      data_simulation[["LAI"]]<<-LAI_filled
       Sim_dates[["Start_lai"]]<<-min(Sim_dates[["Seq_date"]],Sim_dates[["Start_lai"]])
       Sim_dates[["End_lai"]]<<-max(Sim_dates[["Seq_date"]], Sim_dates[["End_lai"]])
 
@@ -622,15 +613,35 @@ shinyServer(function(input, output,session) {
     Sim_dates[["jdate"]]<<-jdate[jdate_index]
     Sim_dates[["dateDays"]]<<-sapply(Sim_dates[["Seq_date"]],numberOfDays)
 
+     # Load coefficients for SUN's ET and carbon calculation
+    ET_coefs<-NULL
+    WUE_coefs<-NULL
+    if(! is.null(input$Input_ETmodel)) {
+      ET_coefs<-read.csv(input$Input_ETmodel$datapath,nrows = Lc_Nos)
+      names(ET_coefs)<-c("LC_ID","Intercept","P_coef","PET_coef","LAI_coef","P_PET_coef","P_LAI_coef","PET_LAI_coef","IGBP","LC_Name")
+      data_simulation[["ET_coefs"]]<<-ET_coefs
+      f_addinfo("simulating","User defined ET model is read.")
+    }
+    if(! is.null(input$Input_WUEmodel)) {
+      WUE_coefs<-read.csv(input$Input_ETmodel$datapath,nrows = Lc_Nos)
+      names(WUE_coefs)<-c("LC_ID","WUE","RECO_Intercept", "RECO_Slope","IGBP","LC_Name")
+      data_simulation[["WUE_coefs"]]<<-WUE_coefs
+      f_addinfo("simulating","User defined WUE model is read.")
+    }
+
+    ## PET parameters
+    par_petHamon<- rep(1,NoBasins)
+
+    print(par_petHamon)
     # Run the model
     print(" runing")
     f_addinfo("simulating","Runing simulation ...")
 
     # get the real simulate period result
     if(mcores>1){
-      result<-mclapply(c(1:NoBasins), WaSSI,datain=data_input,sim.dates=Sim_dates,mc.cores = mcores)
+      result<-mclapply(c(1:NoBasins), WaSSI,datain=data_simulation,sim.dates=Sim_dates,mc.cores = mcores)
     }else{
-      result<-lapply(c(1:NoBasins), WaSSI,datain=data_input,sim.dates=Sim_dates)
+      result<-lapply(c(1:NoBasins), WaSSI,datain=data_simulation,sim.dates=Sim_dates)
     }
 
 
@@ -647,7 +658,7 @@ shinyServer(function(input, output,session) {
     names(Basin_out)<-names(out[[1]])[-1]
     resultOutput[["Basin_output"]]<<-Basin_out
 
-    hru_area<-subset(data_input[["Cellinfo"]],BasinID %in% BasinID_sel)$Area_m2
+    hru_area<-subset(data_simulation[["Cellinfo"]],BasinID %in% BasinID_sel)$Area_m2
     # routing based on catchment area
     if(is.null(par.routing) | is.null(hru_flowlen)){
 
