@@ -679,8 +679,9 @@ shinyServer(function(input, output,session) {
       dplyr::select(-Month,-Date)%>%
       summarise_all(.funs = "sum",na.rm=T)%>%
       mutate(Date=as.Date(paste0(Year,"-01-01")))
+
     df <- output%>%
-      filter(Date>=input$plotSimDaterange[1] & Date<=input$plotSimDaterange[2])
+        filter(Date>=input$plotSimDaterange[1] & Date<=input$plotSimDaterange[2])
 
     output$plotSimOut <- renderPlot({
       #input$plotsimOut
@@ -792,7 +793,7 @@ WaSSI<-function(hru,datain,sim.dates){
 
   # process data for each lc
   vars<-names(hru_lc_out[[1]])
-  vars<-vars[1:(length(vars)-1)]
+  #vars<-vars[1:(length(vars)-1)]
   hru_lc_out<-lapply(vars, function(x) sapply(hru_lc_out, "[[", x))
   names(hru_lc_out)<-vars
   hru_out<-sapply(hru_lc_out, function(x) apply(x, 1, weighted.mean,huc.lc.ratio) )
