@@ -371,6 +371,29 @@ shinyServer(function(input, output,session) {
 
     })
 
+  ## ExportAction: save the processed input data  ----
+    output$downloadInputData <- downloadHandler(
+
+      # This function returns a string which tells the client
+      # browser what name to use when saving the file.
+      filename = function() {
+
+        paste("Inputs", "zip", sep=".")
+      },
+
+      # This function should write data to a file given to it by
+      # the argument 'file'.
+      content = function(fname) {
+
+        fs=dir("www/inputs/","csv",full.names = T)
+        withProgress(message = 'Compressing files ...', value = 0.5,{
+        zip::zipr(zipfile=fname,files=fs)
+        })
+
+      },
+      contentType="application/zip"
+    )
+
   # Tab: Plot input data----
   ## Print: Print the processig infor ----
   output$printplottinginfo<-renderPrint({
@@ -738,10 +761,11 @@ shinyServer(function(input, output,session) {
 #     })
 })
 
-  ## Save: Save all output----
+  ## SaveAction: Save all output----
   observeEvent(input$savesimOut,{
 
     print("Processing the out to output format!")
+    f_addinfo("simulplotting","Processing the out to output format!")
     resultOutput[["Station_output"]]%>%
       dplyr::select(Date,prcp,rain,temp,LAI,PET,PET_hamon, aetTot,
                     flwTot, flwSurface, flwBase,everything())%>%
@@ -797,6 +821,31 @@ shinyServer(function(input, output,session) {
               paste0("The simulated result has been save to default foler 'www/output'"))
 
   })
+
+  ## ExportAction: save the processed input data  ----
+  output$downloadoutputData <- downloadHandler(
+
+    # This function returns a string which tells the client
+    # browser what name to use when saving the file.
+    filename = function() {
+      f_addinfo("simulating","Files are downloaded! ^_^")
+      paste("Outputs", "zip", sep=".")
+    },
+
+    # This function should write data to a file given to it by
+    # the argument 'file'.
+    content = function(fname) {
+
+      fs=dir("www/output/","csv",full.names = T)
+
+      withProgress(message = 'Compressing files ...', value = 0.5,{
+        zip::zipr(zipfile=fname,files=fs)
+      })
+
+    },
+    contentType="application/zip"
+  )
+
     ## Action: select time period for calibration and validation----
 
   } # END

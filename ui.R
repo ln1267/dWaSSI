@@ -96,8 +96,9 @@ shinyUI(
                  # Action: Plot basin ----
                  actionButton("processrasters","process input!"),
                  # Action: Process input ----
-                 actionButton("plotrasterdata","Plot the input data!"),
-                 actionButton("saveInputData","Save the input data!"),
+                 actionButton("plotrasterdata","Plot input data!"),
+                 actionButton("saveInputData","Save input data!"),
+                 downloadButton("downloadInputData", label = "Export input data"),
                  #h2("Upload all original raster files"),
                   HTML("<p>Please chose a '*.tif' or '*.nc' monthly stacked precipitation and temperation file to upload.</p>
                       "),
@@ -208,7 +209,9 @@ shinyUI(
                  # Input: Checkbox if calibate model ----
                  checkboxInput("Calibration", "Calibration", FALSE),
                  ## Action: run model
-                 actionButton("runSimulation","Run Simulation"),
+                 actionButton("runSimulation","Run Simulation!"),
+                 actionButton("savesimOut","Save output!"),
+                 downloadButton("downloadoutputData", label = "Export output data!"),
                  tags$hr(),
                  tags$h5("Simulation log:"),
                  verbatimTextOutput("printsimulatinginfo")
@@ -228,7 +231,6 @@ shinyUI(
                   textInput("plotSimuBasinID", "Type the BasinID for plotting!","0"),
                   # Action: Plot simulated result ---
                    actionButton("plotsimOut","Plot"),
-                  actionButton("savesimOut","Save output"),
                   verbatimTextOutput("printsimplotinfo"),
                     # Output: ploted simulated result
                    plotOutput("SimOutplot")
