@@ -550,6 +550,7 @@ shinyServer(function(input, output,session) {
     if("Flwlen_m" %in% names(data_simulation[["Cellinfo"]])) hru_flowlen<-data_simulation[["Cellinfo"]]$Flwlen_m
 
     # get the number of selected HUCs
+    data_simulation[["BasinID"]]<<-BasinID_sel
     NoBasins<-length(BasinID_sel)
 
     # Select climate data for the HRU
@@ -700,7 +701,7 @@ shinyServer(function(input, output,session) {
   })
   ## PlotAction: Plot model result----
   observeEvent(input$plotsimOut,{
-
+    inforprint$simulplotting<-"Plotting log: "
     plot_dates<-c(input$plotSimDaterange[1],input$plotSimDaterange[2])
 
     output<- resultOutput[["Station_output"]]%>%
@@ -719,32 +720,84 @@ shinyServer(function(input, output,session) {
       summarise_all(.funs = "sum",na.rm=T)%>%
       mutate(Date=as.Date(paste0(Year,"-01-01")))
 
-    df1 <<- output%>%
-        filter(Date>=plot_dates[1] & Date<=plot_dates[2])
+#
+#     output$SimOutplot <- renderPlot({
+#       #input$plotsimOut
+#       #print(head(df))
+#        output%>%
+#         filter(Date>=plot_dates[1] & Date<=plot_dates[2])
+#        gather(Variable,Value,prcp:PET)%>%
+#        filter(Variable %in% c("flwTot","flwBase","flwSurface","rain","prcp"))%>%
+#        mutate(Variable=factor(Variable,levels = c("flwTot","flwBase","flwSurface","rain","prcp","aetTot"),
+#                               labels = c("Total flow","Base flow","Surface flow","Effective rainfall","Precipitation","Actual evpotransipration")))%>%
+#        ggplot(aes(x=Date,y=Value,col=Variable))+
+#        labs(y="(mm/month)")+
+#        scale_x_date(date_breaks = "1 month", date_labels = "%Y")+
+#        geom_line()+geom_point()+
+#        theme_ning(size.axis = 12,size.title =14 )
+#     })
+})
+
+  ## Save: Save all output----
+  observeEvent(input$savesimOut,{
+
+    print("Processing the out to output format!")
+    resultOutput[["Station_output"]]%>%
+      dplyr::select(Date,prcp,rain,temp,LAI,PET,PET_hamon, aetTot,
+                    flwTot, flwSurface, flwBase,everything())%>%
+      write.csv(paste0("www/output/Output_outlet_TS.csv"),row.names=F)
+
+
+    # Process output for each HUC
+   f_ReshapebyBasinID<-function(da,BasinIDs,seq_dates){
+     out<- da%>%
+       do.call(what = rbind)%>%
+       as.data.frame()
+     names(out)<-BasinIDs
+     out[["Date"]]=seq_dates
+     out[["Variable"]]=rep(names(da),each=length(seq_dates))
+     return(out)
+   }
+    BasinIDs<-data_simulation$BasinID
+    seq_dates<-seq(Sim_dates$Start,Sim_dates$End,by="month")
+
+    .a<-f_ReshapebyBasinID(da=resultOutput[["Basin_output"]],
+                          BasinIDs=BasinIDs,
+                          seq_dates=seq_dates)
+    Output_BasinID<-.a%>%
+        melt(id=c("Date","Variable"))%>%
+        rename(BasinID=variable)%>%
+        mutate(BasinID=as.integer(as.character(BasinID)))%>%
+        dcast(BasinID+Date~Variable)%>%
+        dplyr::select(BasinID,Date,prcp,rain,temp,LAI,PET,PET_hamon, aetTot,
+                   flwTot, flwSurface, flwBase,everything())
+    Output_BasinID%>%
+        write.csv(paste0("www/output/Output_BasinID_TS.csv"),row.names=F)
+
+    # Process output for each land cover
+    f_ReshapebyLc<-function(da,Lcs,Output_BasinID){
+      out<- da%>%
+        do.call(what = rbind)%>%
+        as.data.frame()
+      names(out)<-Lcs
+      out<-cbind(Output_BasinID[c("BasinID","Date")],out)
+      return(out)
+    }
+    Lcs<-paste0("Lc_",c(1:9))
+
+    for(var in names(resultOutput[["lc_output"]])){
+      f_ReshapebyLc(da=resultOutput[["lc_output"]][[var]],
+                  Lcs=Lcs,
+                  Output_BasinID=Output_BasinID)%>%
+        write.csv(paste0("www/Output/Output_Lc_TS_",var,".csv"),row.names=F)
+
+    }
+    print("Finished processing the output!")
+    f_addinfo("simulplotting",
+              paste0("The simulated result has been save to default foler 'www/output'"))
+
   })
-
-  ## Action: Plot the basic result----
-  observeEvent(input$plotsimOut,{
-
-    output$SimOutplot <- renderPlot({
-      #input$plotsimOut
-      #print(head(df))
-       df1%>%
-       gather(Variable,Value,prcp:PET)%>%
-       filter(Variable %in% c("flwTot","flwBase","flwSurface","rain","prcp"))%>%
-       mutate(Variable=factor(Variable,levels = c("flwTot","flwBase","flwSurface","rain","prcp","aetTot"),
-                              labels = c("Total flow","Base flow","Surface flow","Effective rainfall","Precipitation","Actual evpotransipration")))%>%
-       ggplot(aes(x=Date,y=Value,col=Variable))+
-       labs(y="(mm/month)")+
-       scale_x_date(date_breaks = "1 year", date_labels = "%Y")+
-       geom_line()+geom_point()+
-       theme_ning(size.axis = 12,size.title =14 )
-    })
-  })
-
-  ## Action: select time period for calibration and validation----
-
-
+    ## Action: select time period for calibration and validation----
 
   } # END
 )
