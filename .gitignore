@@ -14,6 +14,9 @@ INPUTS/Inputs_grid/*
 data/vars/*
 data/landcover/ESA_LC/*
 OUTPUTS*/*
+www/*
+tmp/*
+data/shps/*
 
 # Output files from R CMD build
 /*.tar.gz
