@@ -134,12 +134,11 @@ shinyUI(
                  HTML("<p>It will take a while for the data process. Please wait ...</p>
                       "),
                  leafletOutput("basinrastermap"),
-                 tags$h4("Processing log:"),
+                 tags$h4("Input Summary:"),
                  tags$h5("We recommand upload all raster are in the same projection and cellsize!"),
                  tags$h5("It will take more time to process,
                          if your land cover data's cellsize is much smaller than your LAI data."),
-                 verbatimTextOutput("printprocessinginfo"),
-                 verbatimTextOutput("txt_file"),
+                 #verbatimTextOutput("printprocessinginfo"),
                  verbatimTextOutput("prntraster")
 
 

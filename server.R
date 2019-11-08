@@ -111,6 +111,8 @@ shinyServer(function(input, output,session) {
 
   observeEvent(input$processrasters,{
 
+    withProgress(message = 'Processing ', value = 0, {
+
     inforprint$processing<-"Processing log: "
     if (is.null(BasinShp)) {
       f_addinfo("processing","You need to upload a shapefile including the basins.")
@@ -125,6 +127,8 @@ shinyServer(function(input, output,session) {
       f_addinfo("processing","Warning: Climate data has been processed!")
 
     }else{
+
+      incProgress(0.1, detail = paste("Climate data ...!"))
 
       f_addinfo("processing","Processing climate data ...")
       print("Processsing Climate data ...")
@@ -142,6 +146,7 @@ shinyServer(function(input, output,session) {
       #print(summary(climate))
     }
 
+    incProgress(0.1, detail = paste("Cellinfo ...!"))
     # Process cellinfo
     if(is.null(input$Input_lc_raster)){
       f_addinfo("processing","Warning: There is no land cover input!")
@@ -169,6 +174,7 @@ shinyServer(function(input, output,session) {
 
     }else{
       print("Processing LAIinfo")
+      incProgress(0.2, detail = paste("Lai data ...!"))
       laifname<-input$Input_lai_fpath
       if(laifname=="~")  laifname<-input$Input_lai_raster$datapath
       laiinfo<-f_landlai(lcfname=input$Input_lc_raster$datapath,
@@ -189,6 +195,7 @@ shinyServer(function(input, output,session) {
 
       }else{
       print("Processing Soilinfo")
+      incProgress(0.5, detail = paste("Soilinfo ...!"))
       soilinfo<-f_soilinfo(soilfname=input$Input_soil_raster$datapath,
                           Basins=BasinShp)
       data_input[["Soilinfo"]]<<-soilinfo
@@ -206,6 +213,7 @@ shinyServer(function(input, output,session) {
           print(summary(df))
         }
       })
+    })
   })
 
 
@@ -556,8 +564,16 @@ shinyServer(function(input, output,session) {
       BasinID_sel <- data_simulation[["Cellinfo"]]$BasinID
       f_addinfo("simulating","No Station is provided, so that all HUCs are used in the simulation!")
     }else if(is.null(input$Input_routpar)){
-      f_addinfo("simulating","!!! ERROR: Flow routing file is not provided!")
-      return()
+      f_addinfo("simulating","!!! Warning: Flow routing file is not provided!")
+
+      BasinID_sel<-c(StationID)
+      ## Subset each file
+      data_simulation<<-lapply(data_simulation, function(x) subset(x,BasinID %in% BasinID_sel))
+
+      f_addinfo("simulating",paste0("As no flow routing file is provided,
+                                    only the selected BasinID = ",BasinID_sel, " is used for the simulation!"))
+
+      #return()
     }else{
        routpar<-f_stream_level_pete(input$Input_routpar$datapath)
        BasinID_sel<-f_upstreamHUCs(BasinID =StationID ,routpar=routpar)
@@ -765,12 +781,25 @@ shinyServer(function(input, output,session) {
   observeEvent(input$savesimOut,{
 
     print("Processing the out to output format!")
+
+    save(resultOutput,file="www/resultOutput.Rdata")
+
     f_addinfo("simulplotting","Processing the out to output format!")
     resultOutput[["Station_output"]]%>%
       dplyr::select(Date,prcp,rain,temp,LAI,PET,PET_hamon, aetTot,
                     flwTot, flwSurface, flwBase,everything())%>%
-      write.csv(paste0("www/output/Output_outlet_TS.csv"),row.names=F)
+      write.csv(paste0("www/output/Output_outlet_monthly_TS.csv"),row.names=F)
 
+    resultOutput[["Station_output"]]%>%
+      mutate(Year=as.integer(format(Date,"%Y")))%>%
+      dplyr::select(-Date)%>%
+      group_by(Year)%>%
+      summarise_all(.funs = sum,na.rm=T)%>%
+      mutate(temp=temp/12,LAI=LAI/12,uztwc=uztwc/12,	uzfwc=uzfwc/12,
+             lztwc=lztwc,	lzfpc=lzfpc/12,	lzfsc=lzfsc/12)%>%
+      dplyr::select(Year,prcp,rain,temp,LAI,PET,PET_hamon, aetTot,
+                    flwTot, flwSurface, flwBase,everything())%>%
+      write.csv(paste0("www/output/Output_outlet_annual_TS.csv"),row.names=F)
 
     # Process output for each HUC
    f_ReshapebyBasinID<-function(da,BasinIDs,seq_dates){
@@ -796,7 +825,18 @@ shinyServer(function(input, output,session) {
         dplyr::select(BasinID,Date,prcp,rain,temp,LAI,PET,PET_hamon, aetTot,
                    flwTot, flwSurface, flwBase,everything())
     Output_BasinID%>%
-        write.csv(paste0("www/output/Output_BasinID_TS.csv"),row.names=F)
+        write.csv(paste0("www/output/Output_BasinID_monthly_TS.csv"),row.names=F)
+
+    Output_BasinID%>%
+      mutate(Year=as.integer(format(Date,"%Y")))%>%
+      dplyr::select(-Date)%>%
+      group_by(BasinID,Year)%>%
+      summarise_all(.funs = sum,na.rm=T)%>%
+      mutate(temp=temp/12,LAI=LAI/12,uztwc=uztwc/12,	uzfwc=uzfwc/12,
+             lztwc=lztwc,	lzfpc=lzfpc/12,	lzfsc=lzfsc/12)%>%
+      dplyr::select(BasinID,Year,prcp,rain,temp,LAI,PET,PET_hamon, aetTot,
+                    flwTot, flwSurface, flwBase,everything())%>%
+      write.csv(paste0("www/output/Output_BasinID_annual_TS.csv"),row.names=F)
 
     # Process output for each land cover
     f_ReshapebyLc<-function(da,Lcs,Output_BasinID){
