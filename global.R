@@ -305,12 +305,12 @@ f_soilinfo<-function(soilfname,Basins){
   # fill NA values
   SOIL_catchment[is.infinite(SOIL_catchment)]<-NA
   SOIL_catchment[is.na(SOIL_catchment)]<-0
-  SOIL_catchment<-round(SOIL_catchment,2)
+  SOIL_catchment<-round(SOIL_catchment,4)
 
   colnames(SOIL_catchment)<-c("uztwm", "uzfwm" , "uzk", "zperc" , "rexp" , "lztwm" , "lzfsm",
                               "lzfpm", "lzsk" , "lzpk" , "pfree")
 
-  SOIL_catchment<-cbind(BasinID=Basins$BasinID,SOIL_catchment)
+  SOIL_catchment<-as.data.frame(cbind(BasinID=Basins$BasinID,SOIL_catchment))
   return(SOIL_catchment)
 }
 
@@ -438,6 +438,106 @@ numberOfDays <- function(date) {
 
   return(as.integer(format(date - 1, format="%d")))
 }
+# Hamon Potential Evapotranspiration Equation----
+#' @title Hamon Potential Evapotranspiration Equation
+#' @description The Hamon method is also considered as one of the simplest estimates
+#'     of potential Evapotranspiration.
+#' @param par proportionality coefficient (unitless)
+#' @param tavg  vector of mean daily temperature (deg C)
+#' @param lat latitude ()
+#' @param jdate a day number of the year (julian day of the year)
+#' @return outputs potential evapotranspiration (mm day-1)
+#' @details For details see Haith and Shoemaker (1987)
+#' @examples
+#' \dontrun{
+#' if(interactive()){
+#'  #EXAMPLE1deg
+#'  }
+#' }
+#' @rdname hamon
+#' @export
+hamon <- function(par, tavg, lat, jdate) {
+
+  var_theta <- 0.2163108 + 2 * atan(0.9671396 * tan(0.0086 * (jdate - 186)))
+  var_pi <- asin(0.39795 * cos(var_theta))
+  daylighthr <- 24 - 24/pi * acos((sin(0.8333 * pi/180) + sin(lat * pi/180) * sin(var_pi))/(cos(lat *
+                                                                                                  pi/180) * cos(var_pi)))
+
+  esat <- 0.611 * exp(17.27 * tavg/(237.3 + tavg))
+
+  return(par * 29.8 * daylighthr * (esat/(tavg + 273.2)))
+
+}
+
+
+# SNOW Model based on Tavg----
+#' @title SNOW Model
+#' @description Peter's Snow model
+#' @param ts.prcp numeric vector of precipitation time-series (mm)
+#' @param ts.temp numeric vector of average temperatuer time-series (Deg C)
+#' @param snowrange (-3,1) the temperature range between snow and rain
+#' @param meltmax  maximium ratio of snow melt (default: 0.5)
+#' @param snowpack  initial snowpack (default: 0)
+#' @return a dataframe of c("prcp","snowpack","snowmelt"), effective rainfall, snowpack and snowmelt
+#' @rdname snowmelt
+#' @details This is based on Peter's Fortran code
+#' @examples
+#' \dontrun{
+#' mellt<-snow_melt(ts.prcp,ts.temp,meltmax=0.5,snowrange=c(-3,1),snowpack=0)
+#' }
+#' @export
+snow_melt<-function(ts.prcp,ts.temp,meltmax=0.5,snowrange=c(-3,1),snowpack=0) {
+
+  # Define outputs
+  ts.snowpack <- vector(mode = "numeric", length = length(ts.prcp))
+  ts.snowmelt <- vector(mode = "numeric", length = length(ts.prcp))
+  ts.prcp.eff<- vector(mode = "numeric", length = length(ts.prcp))
+  # loop each time step
+  for (i in c(1:length(ts.prcp))){
+    tavg<-ts.temp[i];prcp<-ts.prcp[i]
+    # ---- FOR TEMPERATURE LESS THAN SNOW TEMP, CALCULATE SNOWPPT
+    if (tavg <= snowrange[1]) {
+      snow<-prcp
+      rain<-0
+      # ---- FOR TEMPERATURE GREATER THAN RAIN TEMP, CALCULATE RAINPPT
+    }else if (tavg >= snowrange[2]){
+      rain<-prcp
+      snow<-0
+      # ---- FOR TEMPERATURE BETWEEN RAINTEMP AND SNOWTEMP, CALCULATE SNOWPPT AND RAINPPT
+    }else{
+      snow<- prcp*((snowrange[2] - tavg)/(snowrange[2] - snowrange[1]))
+      rain<-prcp-snow
+    }
+    # Calculate the snow pack
+    snowpack<-snowpack+snow
+    # ---- CALCULATE SNOW MELT FRACTION BASED ON MAXIMUM MELT RATE (MELTMAX) AND MONTHLY TEMPERATURE
+
+    snowmfrac = ((tavg-snowrange[1])/(snowrange[2] - snowrange[1]))*meltmax
+
+    if (snowmfrac >= meltmax) snowmfrac <- meltmax
+    if (snowmfrac <0) snowmfrac <- 0
+
+    # ---- CALCULATE AMOUNT OF SNOW MELTED (MM) TO CONTRIBUTE TO INFILTRATION & RUNOFF
+
+    # ---- IF SNOWPACK IS LESS THAN 10.0 MM, ASSUME IT WILL ALL MELT (MCCABE AND WOLOCK, 1999)
+    # ---- (GENERAL-CIRCULATION-MODEL SIMULATIONS OF FUTURE SNOWPACK IN THE WESTERN UNITED STATES)
+
+    if (snowpack <= 10.0) {
+      snowm<-snowpack
+      snowpack<- 0
+
+    }else{
+      snowm = snowpack * snowmfrac
+      snowpack = snowpack - snowm
+    }
+
+    # -- COMPUTE THE INFILTRATION FOR A GIVEN MONTH FOR EACH LAND USE
+    ts.snowpack[i]<-snowpack
+    ts.snowmelt[i]<-snowm
+    ts.prcp.eff[i]<-rain+snowm
+  }
+  return(data.frame(prcp=ts.prcp.eff,snowpack=ts.snowpack,snowmelt=ts.snowmelt))
+}
 
 
 # Parallel wrap of WaSSI-C model----
@@ -484,24 +584,14 @@ dWaSSIC<- function(sim.dates, warmup=3,mcores=1,
   hru_prcp <- clim.prcp[grid_ind,]
   hru_tavg <- clim.tavg[grid_ind,]
 
-  # HRU parameters
-  hru_num   <- nrow(hru.info)  # total number of hrus in the watershed
-  hru_lat     <- hru.info$Latitude # Latitude of each HRU (Deg)
-  # hru_lon     <- hru.info$HRU_Lon # Longitude of each HRU (Deg)
-  hru_area<-NULL;hru_elev<-NULL;hru_flowlen<-NULL
-  if("Area_m2" %in% names(hru.info)) hru_area <- hru.info$Area_m2 # Area of each HRU (as %)
-  if("Elev_m" %in% names(hru.info)) hru_elev    <- hru.info$Elev_m # Elevation of each HRU (m)
-  if("FlwLen_m" %in% names(hru.info)) hru_flowlen    <- hru.info$FlwLen_m # Elevation of each HRU (m)
-
-  #get the number of land cover types
   if (!is.null(huc.lc.ratio)) NLCs<-length(huc.lc.ratio[1,])
   # WaSSI for each HRU and calculate adjust temp and pet values
-
   WaSSI<-function(h){
 
     # Using snowmelt function to calculate effective rainfall
 
-    hru_mrain <- snow_melt(ts.prcp = hru_prcp[,h],ts.temp = hru_tavg[,h],snowrange = c(-5,1))$prcp
+    snow.result<-snow_melt(ts.prcp = hru_prcp[,h],ts.temp = hru_tavg[,h],snowrange = c(-5,1))
+    hru_rain <- snow.result$prcp
 
     # PET using Hamon equation
     hru_pet <- hamon(par = par.petHamon[h], tavg = hru_tavg[,h], lat = hru_lat[h], jdate = jdate)
@@ -549,6 +639,14 @@ dWaSSIC<- function(sim.dates, warmup=3,mcores=1,
       }
     }
 
+    # combin all the input
+    hru_in<-list(prcp=hru_prcp[,h],
+                    temp = hru_tavg[,h],
+                    rain=hru_rain,
+                    snowpack=snow.result$snowpack,
+                    snowmelt=snow.result$snowmelt,
+                    PET_hamon=hru_pet)
+
     # calculate flow based on PET and SAC-SMA model
     hru_lc_out <-apply(hru_lc_pet,2,sacSma_mon,par = par.sacsma[h,], prcp = hru_mrain )
 
@@ -559,14 +657,18 @@ dWaSSIC<- function(sim.dates, warmup=3,mcores=1,
         hru_lc_out[[i]][["RECO"]]<-WUE.coefs$RECO_Intercept[i] + hru_lc_out[[i]][["GEP"]] *WUE.coefs$RECO_Slope[i]
         hru_lc_out[[i]][["NEE"]] <-hru_lc_out[[i]][["RECO"]]-hru_lc_out[[i]][["GEP"]]
       }
-
     }
+    for (i in c(1:NLCs)){
+      hru_lc_out[[i]][["LAI"]]<-hru.lc.lai[[h]][i]
+      hru_lc_out[[i]][["PET"]]<-hru_lc_pet[,i]
+    }
+
     # Weight each land cover type based on it's ratio
     hru_out<-lapply(c(1:length(huc.lc.ratio[h,])),function(x) lapply(hru_lc_out[[x]],function(y) huc.lc.ratio[h,x]*y))
     out<-lapply(names(hru_lc_out[[1]]), function(var) apply(sapply(hru_out, function(x) x[[var]]),1,sum))
     names(out)<-names(hru_lc_out[[1]])
 
-    return(out)
+    return(list(input=hru_in,out=out,lc_out=hru_lc_out))
   }
 
   huc_routing<-function(h){
@@ -583,13 +685,13 @@ dWaSSIC<- function(sim.dates, warmup=3,mcores=1,
   }else{
     result<-lapply(c(1:hru_num), WaSSI)
   }
-
-  out<- lapply(result, function(x) as.data.frame(x)[(warmup*12+1):length(x[[1]]),])
+  out<-list()
+  out[["input"]]<- lapply(result[["input"]], function(x) as.data.frame(x)[(warmup*12+1):length(x[[1]]),])
 
   # routing based on catchment area
   if(is.null(par.routing) | is.null(hru_flowlen) | is.null(hru_area)){
 
-    return(out)
+    return(list(HUC=out))
 
   }else{
     # Channel flow routing from Lohmann routing model
@@ -601,10 +703,32 @@ dWaSSIC<- function(sim.dates, warmup=3,mcores=1,
   return(list(FLOW_SURF = out3[[1]], FLOW_BASE=out3[[2]],HUC=out))
 
 }
-librs<-c("dplyr","raster","ggplot2","leaflet","rgdal","rgeos","leaflet.extras","parallel","shinyFiles")
+
+
+get_os <- function(){
+  sysinf <- Sys.info()
+  if (!is.null(sysinf)){
+    os <- sysinf['sysname']
+    if (os == 'Darwin')
+      os <- "osx"
+  } else { ## mystery machine
+    os <- .Platform$OS.type
+    if (grepl("^darwin", R.version$os))
+      os <- "osx"
+    if (grepl("linux-gnu", R.version$os))
+      os <- "linux"
+  }
+  tolower(os)
+}
+
+librs<-c("dplyr","zip","lubridate","raster","ggplot2","leaflet","rgdal","rgeos","leaflet.extras","parallel","shinyFiles","tidyr","reshape2")
 f_lib_check(librs)
 
 if(!exists("data_input")) data_input<-list()
 Ning<-"Ning Liu"
 if(!exists("data_simulation")) data_simulation<-list()
 if(!exists("Sim_dates")) Sim_dates<-list()
+if(!exists("resultOutput")) resultOutput<-list()
+mcores=detectCores()
+if(get_os()=="windows") mcores=1
+warmup<-2
