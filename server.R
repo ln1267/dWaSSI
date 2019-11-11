@@ -875,9 +875,10 @@ shinyServer(function(input, output,session) {
       write.csv(paste0("www/output/Output_BasinID_annual_TS.csv"),row.names=F)
 
     Output_BasinID_ann%>%
-      group_by(BasinID,Year)%>%
+      dplyr::select(-Year)%>%
+      group_by(BasinID)%>%
       summarise_all(.funs = mean,na.rm=T)%>%
-      write.csv(paste0("www/output/Output_BasinID_avg_TS.csv"),row.names=F)
+      write.csv(paste0("www/output/Output_BasinID_avg.csv"),row.names=F)
 
     # Process output for each land cover
     f_ReshapebyLc<-function(da,Lcs,Output_BasinID){
