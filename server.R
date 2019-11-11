@@ -814,7 +814,7 @@ shinyServer(function(input, output,session) {
 
   ## SaveAction: Save all output----
   observeEvent(input$savesimOut,{
-
+    inforprint$simulplotting<-"Plotting log: "
     print("Processing the out to output format!")
 
     save(resultOutput,file="www/resultOutput.Rdata")
@@ -862,7 +862,7 @@ shinyServer(function(input, output,session) {
     Output_BasinID%>%
         write.csv(paste0("www/output/Output_BasinID_monthly_TS.csv"),row.names=F)
 
-    Output_BasinID%>%
+    Output_BasinID_ann<- Output_BasinID%>%
       mutate(Year=as.integer(format(Date,"%Y")))%>%
       dplyr::select(-Date)%>%
       group_by(BasinID,Year)%>%
@@ -870,8 +870,14 @@ shinyServer(function(input, output,session) {
       mutate(temp=temp/12,LAI=LAI/12,uztwc=uztwc/12,	uzfwc=uzfwc/12,
              lztwc=lztwc,	lzfpc=lzfpc/12,	lzfsc=lzfsc/12)%>%
       dplyr::select(BasinID,Year,prcp,rain,temp,LAI,PET,PET_hamon, aetTot,
-                    flwTot, flwSurface, flwBase,everything())%>%
+                    flwTot, flwSurface, flwBase,everything())
+    Output_BasinID_ann%>%
       write.csv(paste0("www/output/Output_BasinID_annual_TS.csv"),row.names=F)
+
+    Output_BasinID_ann%>%
+      group_by(BasinID,Year)%>%
+      summarise_all(.funs = mean,na.rm=T)%>%
+      write.csv(paste0("www/output/Output_BasinID_avg_TS.csv"),row.names=F)
 
     # Process output for each land cover
     f_ReshapebyLc<-function(da,Lcs,Output_BasinID){
@@ -888,7 +894,38 @@ shinyServer(function(input, output,session) {
       f_ReshapebyLc(da=resultOutput[["lc_output"]][[var]],
                   Lcs=Lcs,
                   Output_BasinID=Output_BasinID)%>%
-        write.csv(paste0("www/Output/Output_Lc_TS_",var,".csv"),row.names=F)
+        write.csv(paste0("www/Output/Output_Lc_monthly_TS_",var,".csv"),row.names=F)
+
+      dd_mon<-f_ReshapebyLc(da=resultOutput[["lc_output"]][[var]],
+                    Lcs=Lcs,
+                    Output_BasinID=Output_BasinID)%>%
+        mutate(Year=as.integer(format(Date,"%Y")))%>%
+        dplyr::select(-Date)
+      if(var %in% c("aetTot","flwTot","flwSurface","flwBase","PET")){
+        dd_ann<-dd_mon %>%
+          group_by(BasinID,Year) %>%
+          summarise_all(.funs = sum)
+        dd_ann%>%
+          write.csv(paste0("www/Output/Output_Lc_annual_TS_",var,".csv"),row.names=F)
+
+        dd_ann %>%
+          group_by(BasinID) %>%
+          dplyr::select(-Year)%>%
+          summarise_all(.funs = mean)%>%
+          write.csv(paste0("www/Output/Output_Lc_avg_",var,".csv"),row.names=F)
+      }else{
+        dd_mon %>%
+          group_by(BasinID,Year) %>%
+          summarise_all(.funs = mean)%>%
+          write.csv(paste0("www/Output/Output_Lc_annual_TS_",var,".csv"),row.names=F)
+
+        dd_mon %>%
+          group_by(BasinID) %>%
+          dplyr::select(-Year)%>%
+          summarise_all(.funs = mean)%>%
+          write.csv(paste0("www/Output/Output_Lc_avg_",var,".csv"),row.names=F)
+      }
+
 
     }
     print("Finished processing the output!")
