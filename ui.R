@@ -166,6 +166,7 @@ shinyUI(
                  # Input: Month ----
                  checkboxGroupInput("plotmonths","Select the months to plot",c(1:12),selected=c(1:12),inline=T),
 
+                 checkboxInput("plotannualinput", "Annual", FALSE),
                  # Action: plot input data ----
                  actionButton("plotdata","Plot the selected input data!")
                ),

@@ -480,16 +480,37 @@ shinyServer(function(input, output,session) {
         input$plotdata
         if(data2plot == "Climate"){
 
-          p1<-ggplot(df,aes(x=Date,y=Ppt_mm))+geom_line(col="blue")+geom_point(col="blue")+
-            ggtitle(paste0("Monthly Precipitation (mm/month)"))+
-            facet_wrap(BasinID~.,ncol=2)+
-            scale_x_date(date_breaks = "1 year", date_labels = "%Y")+
-            theme_ning(size.axis = 12,size.title = 14)
-          p2<-ggplot(df,aes(x=Date,y=Tavg_C))+geom_line(col="forestgreen")+geom_point(col="forestgreen")+
-            ggtitle(paste0("Monthly mean temperature (C)"))+
-            facet_wrap(BasinID~.,ncol=2)+
-            scale_x_date(date_breaks = "1 year", date_labels = "%Y")+
-            theme_ning(size.axis = 12,size.title = 14)
+          if(input$plotannualinput){
+
+            # plot annual result
+            df<-df%>%
+              dplyr::select(-Date,-Month)%>%
+              group_by(BasinID,Year)%>%
+              summarise(Ppt_mm=sum(Ppt_mm),Tavg_C=mean(Tavg_C))
+            p1<-ggplot(df,aes(x=Year,y=Ppt_mm))+geom_line(col="blue")+geom_point(col="blue")+
+              ggtitle(paste0("Annual Precipitation (mm/yr)"))+
+              facet_wrap(BasinID~.,ncol=2)+
+              scale_x_continuous(breaks = c(1982:2018))+
+              theme_ning(size.axis = 12,size.title = 14)
+            p2<-ggplot(df,aes(x=Year,y=Tavg_C))+geom_line(col="forestgreen")+geom_point(col="forestgreen")+
+              ggtitle(paste0("Annual mean temperature (C)"))+
+              facet_wrap(BasinID~.,ncol=2)+
+              scale_x_continuous(breaks = c(1982:2018))+
+              theme_ning(size.axis = 12,size.title = 14)
+
+          }else{
+            p1<-ggplot(df,aes(x=Date,y=Ppt_mm))+geom_line(col="blue")+geom_point(col="blue")+
+              ggtitle(paste0("Monthly Precipitation (mm/month)"))+
+              facet_wrap(BasinID~.,ncol=2)+
+              scale_x_date(date_breaks = "1 year", date_labels = "%Y")+
+              theme_ning(size.axis = 12,size.title = 14)
+            p2<-ggplot(df,aes(x=Date,y=Tavg_C))+geom_line(col="forestgreen")+geom_point(col="forestgreen")+
+              ggtitle(paste0("Monthly mean temperature (C)"))+
+              facet_wrap(BasinID~.,ncol=2)+
+              scale_x_date(date_breaks = "1 year", date_labels = "%Y")+
+              theme_ning(size.axis = 12,size.title = 14)
+          }
+
 
           multiplot(p1,p2,cols = 1)
 
@@ -500,16 +521,30 @@ shinyServer(function(input, output,session) {
             gather(Lcs,LAI,plotvars)
           if(length(plotvarname)==length(plotvars)) df$Lcs<-factor(df$Lcs,levels =plotvars,labels = plotvarname)
 
-          df%>%
-            ggplot(aes(x=Date,y=LAI,col=Lcs,shape=Lcs))+geom_line()+geom_point(size=2.5)+
-            ggtitle(paste0("Monthly Leaf area index (m2/m2)"))+
-            facet_wrap(BasinID~.,ncol=2)+
-            labs(col = "Land cover",shape="Land cover")+
-            scale_x_date(date_breaks = "1 year", date_labels = "%Y")+
-            theme_ning(size.axis = 12,size.title = 14)
+          if(input$plotannualinput){
+            df%>%
+              mutate(Year=as.integer(format(Date,"%Y")))%>%
+              dplyr::select(-Date)%>%
+              group_by(BasinID,Lcs,Year)%>%
+              summarise(LAI=mean(LAI))%>%
+              ggplot(aes(x=Year,y=LAI,col=Lcs,shape=Lcs))+geom_line()+geom_point(size=2.5)+
+              ggtitle(paste0("Annual mean Leaf area index (m2/m2)"))+
+              facet_wrap(BasinID~.,ncol=2)+
+              labs(col = "Land cover",shape="Land cover")+
+              scale_x_continuous(breaks = c(1982:2018))+
+              theme_ning(size.axis = 12,size.title = 14)
+            }else{
 
+              df%>%
+                ggplot(aes(x=Date,y=LAI,col=Lcs,shape=Lcs))+geom_line()+geom_point(size=2.5)+
+                ggtitle(paste0("Monthly Leaf area index (m2/m2)"))+
+                facet_wrap(BasinID~.,ncol=2)+
+                labs(col = "Land cover",shape="Land cover")+
+                scale_x_date(date_breaks = "1 year", date_labels = "%Y")+
+                theme_ning(size.axis = 12,size.title = 14)
+
+          }
         }
-
       })
   })
   # Tab: simulation----
@@ -943,9 +978,9 @@ WaSSI<-function(hru,datain,sim.dates){
   # Calculate Carbon based on WUE for each vegetation type
   if(!is.null(WUE.coefs)){
     for (i in c(1:NoLcs)){
-      hru_lc_out[[i]][["GEP"]]<-hru_lc_out[[i]][["totaet"]] *WUE.coefs$WUE[i]
-      hru_lc_out[[i]][["RECO"]]<-WUE.coefs$RECO_Intercept[i] + hru_lc_out[[i]][["GEP"]] *WUE.coefs$RECO_Slope[i]
-      hru_lc_out[[i]][["NEE"]] <-hru_lc_out[[i]][["RECO"]]-hru_lc_out[[i]][["GEP"]]
+      hru_lc_out[["GEP"]][[i]]<-hru_lc_out[["totaet"]][[i]] *WUE.coefs$WUE[i]
+      hru_lc_out[["RECO"]][[i]]<-WUE.coefs$RECO_Intercept[i] + hru_lc_out[[i]][["GEP"]] *WUE.coefs$RECO_Slope[i]
+      hru_lc_out[["NEE"]][[i]] <-hru_lc_out[["RECO"]][[i]]-hru_lc_out[["GEP"]][[i]]
     }
   }
   # Add LAI and PET to each land cover and subset the target period
