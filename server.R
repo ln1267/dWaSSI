@@ -723,10 +723,18 @@ shinyServer(function(input, output,session) {
     f_addinfo("simulating","Runing simulation ...")
 
     # get the real simulate period result
-    if(mcores>1){
-      result<-mclapply(BasinID_sel, WaSSI,datain=data_simulation,sim.dates=Sim_dates,mc.cores = mcores)
-    }else{
+    if(NoBasins<50){
       result<-lapply(BasinID_sel, WaSSI,datain=data_simulation,sim.dates=Sim_dates)
+    }else{
+
+      if(.Platform$OS.type=="windows"){
+        cl<-makeCluster(mcores, type="SOCK")
+        clusterExport(cl, c("snow_melt","hamon","WaSSI","sacSma_mon"))
+        result<-clusterApply(cl,BasinID_sel, WaSSI,datain=data_simulation,sim.dates=Sim_dates)
+        stopCluster(cl)
+      }else{
+        result<-mclapply(BasinID_sel, WaSSI,datain=data_simulation,sim.dates=Sim_dates,mc.cores = mcores)
+      }
     }
     print("Finished runing the simulation")
 
@@ -989,6 +997,8 @@ shinyServer(function(input, output,session) {
 
 # WaSSI for each HRU and calculate adjust temp and pet values
 WaSSI<-function(hru,datain,sim.dates){
+  require(dplyr)
+  library(tidyr)
 
   # Set the input variables
   hru_prcp<-subset(datain$Climate,BasinID==hru)$Ppt_mm[sim.dates$climate_index]
