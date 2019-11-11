@@ -705,22 +705,6 @@ dWaSSIC<- function(sim.dates, warmup=3,mcores=1,
 }
 
 
-get_os <- function(){
-  sysinf <- Sys.info()
-  if (!is.null(sysinf)){
-    os <- sysinf['sysname']
-    if (os == 'Darwin')
-      os <- "osx"
-  } else { ## mystery machine
-    os <- .Platform$OS.type
-    if (grepl("^darwin", R.version$os))
-      os <- "osx"
-    if (grepl("linux-gnu", R.version$os))
-      os <- "linux"
-  }
-  tolower(os)
-}
-
 librs<-c("dplyr","zip","lubridate","raster","ggplot2","leaflet","rgdal","rgeos","leaflet.extras","parallel","shinyFiles","tidyr","reshape2")
 f_lib_check(librs)
 
@@ -729,6 +713,6 @@ Ning<-"Ning Liu"
 if(!exists("data_simulation")) data_simulation<-list()
 if(!exists("Sim_dates")) Sim_dates<-list()
 if(!exists("resultOutput")) resultOutput<-list()
-mcores=detectCores()
-if(get_os()=="windows") mcores=1
+mcores=detectCores()-1
+#if(.Platform$OS.type=="windows") mcores=1
 warmup<-2
