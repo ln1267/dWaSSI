@@ -778,38 +778,54 @@ shinyServer(function(input, output,session) {
     inforprint$simulplotting<-"Plotting log: "
     plot_dates<-c(input$plotSimDaterange[1],input$plotSimDaterange[2])
 
-    output<- resultOutput[["Station_output"]]%>%
+    output_monthly<- resultOutput[["Station_output"]]%>%
       mutate(Year=as.integer(format(Date,"%Y")),
              Month=as.integer(format(Date,"%m")))
-    daterange_output<-range(output$Date)
+    daterange_output<-range(output_monthly$Date)
     # Check the input dataset
     if(daterange_output[1]>plot_dates[1] | daterange_output[2]<plot_dates[2]){
       f_addinfo("simulplotting",paste0("!!! ERROR: You can only select the period of ",paste(range(daterange_output),collapse="-")))
       return()
     }
 
-    output_ann<-output%>%
-      group_by(Year)%>%
-      dplyr::select(-Month,-Date)%>%
-      summarise_all(.funs = "sum",na.rm=T)%>%
-      mutate(Date=as.Date(paste0(Year,"-01-01")))
+  df<-resultOutput[["Station_output"]]%>%
+    filter(Date>=plot_dates[1] & Date<=plot_dates[2])
 
-#
-#     output$SimOutplot <- renderPlot({
-#       #input$plotsimOut
-#       #print(head(df))
-#        output%>%
-#         filter(Date>=plot_dates[1] & Date<=plot_dates[2])
-#        gather(Variable,Value,prcp:PET)%>%
-#        filter(Variable %in% c("flwTot","flwBase","flwSurface","rain","prcp"))%>%
-#        mutate(Variable=factor(Variable,levels = c("flwTot","flwBase","flwSurface","rain","prcp","aetTot"),
-#                               labels = c("Total flow","Base flow","Surface flow","Effective rainfall","Precipitation","Actual evpotransipration")))%>%
-#        ggplot(aes(x=Date,y=Value,col=Variable))+
-#        labs(y="(mm/month)")+
-#        scale_x_date(date_breaks = "1 month", date_labels = "%Y")+
-#        geom_line()+geom_point()+
-#        theme_ning(size.axis = 12,size.title =14 )
-#     })
+    output$SimOutplot <- renderPlot({
+      input$plotsimOut
+      #print(head(df))
+      if(input$plotannualoutput){
+        df%>%
+          mutate(Year=as.integer(format(Date,"%Y")))%>%
+          dplyr::select(-Date)%>%
+          group_by(Year)%>%
+          summarise_all(.funs = sum)%>%
+          gather(Variable,Value,prcp:PET)%>%
+          filter(Variable %in% c("flwTot","flwBase","flwSurface","aetTot","prcp"))%>%
+          mutate(Variable=factor(Variable,levels = c("flwTot","flwBase","flwSurface","rain","prcp","aetTot"),
+                                 labels = c("Total flow","Base flow","Surface flow","Effective rainfall","Precipitation","Actual evpotransipration")))%>%
+          ggplot(aes(x=Year,y=Value,col=Variable))+
+          labs(y="(mm/yr)")+
+          scale_x_continuous(breaks = c(1980:2018))+
+          geom_line()+geom_point()+
+          theme_ning(size.axis = 12,size.title =14 )
+
+
+      }else{
+        df%>%
+          gather(Variable,Value,prcp:PET)%>%
+          filter(Variable %in% c("flwTot","flwBase","flwSurface","rain","prcp","aetTot"))%>%
+          mutate(Variable=factor(Variable,levels = c("flwTot","flwBase","flwSurface","rain","prcp","aetTot"),
+                                 labels = c("Total flow","Base flow","Surface flow","Effective rainfall","Precipitation","Actual evpotransipration")))%>%
+          ggplot(aes(x=Date,y=Value,col=Variable))+
+          labs(y="(mm/month)")+
+          scale_x_date(date_breaks = "1 year", date_labels = "%Y")+
+          geom_line()+geom_point()+
+          theme_ning(size.axis = 12,size.title =14 )
+
+      }
+
+    })
 })
 
   ## SaveAction: Save all output----
@@ -825,7 +841,7 @@ shinyServer(function(input, output,session) {
                     flwTot, flwSurface, flwBase,everything())%>%
       write.csv(paste0("www/output/Output_outlet_monthly_TS.csv"),row.names=F)
 
-    resultOutput[["Station_output"]]%>%
+    annual_output<-resultOutput[["Station_output"]]%>%
       mutate(Year=as.integer(format(Date,"%Y")))%>%
       dplyr::select(-Date)%>%
       group_by(Year)%>%
@@ -833,7 +849,9 @@ shinyServer(function(input, output,session) {
       mutate(temp=temp/12,LAI=LAI/12,uztwc=uztwc/12,	uzfwc=uzfwc/12,
              lztwc=lztwc,	lzfpc=lzfpc/12,	lzfsc=lzfsc/12)%>%
       dplyr::select(Year,prcp,rain,temp,LAI,PET,PET_hamon, aetTot,
-                    flwTot, flwSurface, flwBase,everything())%>%
+                    flwTot, flwSurface, flwBase,everything())
+    resultOutput[["Output_station_annual"]]<<-annual_output
+    annual_output%>%
       write.csv(paste0("www/output/Output_outlet_annual_TS.csv"),row.names=F)
 
     # Process output for each HUC
@@ -859,6 +877,7 @@ shinyServer(function(input, output,session) {
         dcast(BasinID+Date~Variable)%>%
         dplyr::select(BasinID,Date,prcp,rain,temp,LAI,PET,PET_hamon, aetTot,
                    flwTot, flwSurface, flwBase,everything())
+    resultOutput[["Output_Basin_monthly"]]<<- Output_BasinID
     Output_BasinID%>%
         write.csv(paste0("www/output/Output_BasinID_monthly_TS.csv"),row.names=F)
 
@@ -871,13 +890,16 @@ shinyServer(function(input, output,session) {
              lztwc=lztwc,	lzfpc=lzfpc/12,	lzfsc=lzfsc/12)%>%
       dplyr::select(BasinID,Year,prcp,rain,temp,LAI,PET,PET_hamon, aetTot,
                     flwTot, flwSurface, flwBase,everything())
+    resultOutput[["Output_Basin_annual"]]<<- Output_BasinID_ann
     Output_BasinID_ann%>%
       write.csv(paste0("www/output/Output_BasinID_annual_TS.csv"),row.names=F)
 
-    Output_BasinID_ann%>%
+    Output_BasinID_avg<-Output_BasinID_ann%>%
       dplyr::select(-Year)%>%
       group_by(BasinID)%>%
-      summarise_all(.funs = mean,na.rm=T)%>%
+      summarise_all(.funs = mean,na.rm=T)
+    resultOutput[["Output_Basin_avg"]]<<- Output_BasinID_avg
+    Output_BasinID_avg%>%
       write.csv(paste0("www/output/Output_BasinID_avg.csv"),row.names=F)
 
     # Process output for each land cover
@@ -892,14 +914,14 @@ shinyServer(function(input, output,session) {
     Lcs<-paste0("Lc_",c(1:9))
 
     for(var in names(resultOutput[["lc_output"]])){
-      f_ReshapebyLc(da=resultOutput[["lc_output"]][[var]],
+      lc_mon_output<-f_ReshapebyLc(da=resultOutput[["lc_output"]][[var]],
                   Lcs=Lcs,
-                  Output_BasinID=Output_BasinID)%>%
+                  Output_BasinID=Output_BasinID)
+      resultOutput[["Output_lc_monthly"]]<<- lc_mon_output
+      lc_mon_output%>%
         write.csv(paste0("www/Output/Output_Lc_monthly_TS_",var,".csv"),row.names=F)
 
-      dd_mon<-f_ReshapebyLc(da=resultOutput[["lc_output"]][[var]],
-                    Lcs=Lcs,
-                    Output_BasinID=Output_BasinID)%>%
+      dd_mon<-lc_mon_output%>%
         mutate(Year=as.integer(format(Date,"%Y")))%>%
         dplyr::select(-Date)
       if(var %in% c("aetTot","flwTot","flwSurface","flwBase","PET")){

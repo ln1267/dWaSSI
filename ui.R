@@ -222,15 +222,17 @@ shinyUI(
 
 
                    h2("Plot water and carbon processes"),
-                  # Input: Result plot variables ----
-                  checkboxGroupInput("plotvars","Select the variables to plot",c("P","T","Q"),inline = T),
 
                   # Input: Year for plotting ---
                   #sliderInput("plotSimDaterange", "Year plot", 1970, 2017, value = c(2000, 2010)),
                   dateRangeInput("plotSimDaterange","Select the date range for plotting"),
-                  textInput("plotSimuBasinID", "Type the BasinID for plotting!","0"),
+                  #textInput("plotSimuBasinID", "Type the BasinID for plotting!","0"),
                   # Action: Plot simulated result ---
-                   actionButton("plotsimOut","Plot"),
+                  # Input: Result plot variables ----
+                  checkboxGroupInput("plotvars","Select the variables to plot",c("P","AET","Q"),inline = T),
+
+                  checkboxInput("plotannualoutput", "Annual", FALSE),
+                  actionButton("plotsimOut","Plot"),
                   verbatimTextOutput("printsimplotinfo"),
                     # Output: ploted simulated result
                    plotOutput("SimOutplot")
