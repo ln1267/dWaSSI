@@ -15,27 +15,15 @@ shinyUI(
                #tags$img(src = 'coweeta_logo.jpg',width=600),
 
               tags$h4("Description"),
-              tags$html("This is the distributed R-based ", tags$b("WaSSI")," model. The original model code is written in Fortran and is publicly accessible. The R version is translated from the Fortran code developed by Peter Caldwell and R code of Sac-sma developed by Umit Taner."),
+              tags$html("This is the distributed R-based Water Supply and Stress Index ", tags$b("(WaSSI)")," model.
+              The WaSSI model is a monthly hydrologic model developed by Sun et al. (2011).
+                        The key component of WaSSI mode is evapotranspiration (ET),
+                        which is calculated by an empirical model with leaf area index (LAI),
+                        precipitation (P) and potential evapotranspiration (PET).
+                        In order to consider the effect of soil water storage on water balance,
+                        the actual ET was calculated by the Sacramento Soil Moisture Accounting (SAC-SMA) model.
+                        More details of the WaSSI model can be found on the WaSSI model's ", tags$a("website",href="https://forestthreats.org/research/tools/WaSSI/")),
               tags$br(),
-              tags$html("The web application for WaSSI allows users to define a custom simulation scenario,
-                        view/download model inputs and outputs in tabular and graphical form for a location of interest,
-                        and view/export model outputs spatially for a variety of time scales using an interactive map viewer.
-                        Users may select their location in the map viewer,
-                        select a specific HUC, or input a zip code to view model inputs and outputs"),
-              tags$hr(),
-              tags$h4("WaSSI"),
-              tags$html("WaSSI is an integrated, process-based model that
-                        can be used to project the effects of forest land cover change,
-                        climate change, and water withdrawals on river flows, water supply stress,
-                        and ecosystem productivity (i.e. carbon dynamics).
-                        WaSSI operates on a monthly time step at the HUC-4 (8-digit HUC)
-                        watershed scale (see more on HUCs) and across Mexico at the 0.5 degree scale.
-                        For the conterminous U.S., the model can also be run at the HUC12
-                        scale for water and carbon balances from 1960 to 2012.
-                        As water yield and carbon sequestration are tightly coupled,
-                        WaSSI can be used to evaluate trade-offs among management strategies for these ecosystem services."),
-              tags$br(),
-              tags$html("Further information is available at: USDA - Forest Service or the Guide"),
               tags$hr(),
                h4("Author:"),
                p("Dr Ning Liu.",p(),a("Email: LN1267@Gmail.com",href="mailto:LN1267@Gmail.com")),
@@ -210,7 +198,7 @@ shinyUI(
                  checkboxInput("Calibration", "Calibration", FALSE),
                  ## Action: run model
                  actionButton("runSimulation","Run Simulation!"),
-                 actionButton("savesimOut","Save output!"),
+                 #actionButton("savesimOut","Save output!"),
                  downloadButton("downloadoutputData", label = "Export output data!"),
                  tags$hr(),
                  tags$h5("Simulation log:"),

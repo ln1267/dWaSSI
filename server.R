@@ -556,7 +556,12 @@ shinyServer(function(input, output,session) {
 
   ## Action: Run model ----
   observeEvent(input$runSimulation, {
+
     inforprint$simulating<-"Processing log:"
+
+    withProgress(message = 'In process ...', value = 0,{
+
+    incProgress(0.1, detail = paste("preparing input for simulation..."))
 
     Sim_dates[["Start"]]<<-as.Date(format(input$dateSimulation[1],"%Y-%m-01"))
     Sim_dates[["End"]]<<-as.Date(format(input$dateSimulation[2],"%Y-%m-01"))
@@ -591,6 +596,8 @@ shinyServer(function(input, output,session) {
     print(paste0("There are ",Lc_Nos," land cover types."))
 
     data_simulation<<-data_input
+
+
     # Select HUCs for simulation
     StationID<-as.integer(input$StationID)
     routpar<-NULL
@@ -618,7 +625,7 @@ shinyServer(function(input, output,session) {
 
        f_addinfo("simulating",paste0("There are ",length(BasinID_sel),
                                     " HRUs in the upstreams of the station are selected for the simulation!"))
-}
+    }
 
     # Update flow_len
     if("Flwlen_m" %in% names(data_simulation[["Cellinfo"]])) hru_flowlen<-data_simulation[["Cellinfo"]]$Flwlen_m
@@ -718,12 +725,13 @@ shinyServer(function(input, output,session) {
     ## PET parameters
     par_petHamon<- rep(1,NoBasins)
 
+    incProgress(0.2, detail = paste("runing simulation..."))
     # Run the model
     print("runing the simulation")
     f_addinfo("simulating","Runing simulation ...")
 
     # get the real simulate period result
-    if(NoBasins<50){
+    if(NoBasins<30){
       result<-lapply(BasinID_sel, WaSSI,datain=data_simulation,sim.dates=Sim_dates)
     }else{
 
@@ -738,6 +746,7 @@ shinyServer(function(input, output,session) {
     }
     print("Finished runing the simulation")
 
+    incProgress(0.4, detail = paste("Processing output..."))
     # process the result for HUC level
     lc_out<-lapply(result, "[[","lc_output")
     vars<-names(lc_out[[1]])
@@ -770,8 +779,145 @@ shinyServer(function(input, output,session) {
       out2 <- mclapply(BasinID_sel, huc_routing,mc.cores = mcores)
       out3<-lapply(names(out2[[1]]), function(var) apply(sapply(out2, function(x) x[[var]]),1,sum))
 
-    }
+      }
+
     f_addinfo("simulating","Finished simulation! ^_^")
+
+    # save the original whole result list
+    save(resultOutput,file="www/tmp/resultOutput.Rdata")
+
+    incProgress(0.1, detail = paste("saving data for the whole basin!"))
+    # process station output
+    ## Monthly
+    resultOutput[["Station_output"]]%>%
+      dplyr::select(Date,prcp,rain,temp,LAI,PET,PET_hamon, aetTot,
+                    flwTot, flwSurface, flwBase,everything())%>%
+      write.csv(paste0("www/tmp/Output_outlet_monthly_TS.csv"),row.names=F)
+
+    ## Annual
+    annual_output<-resultOutput[["Station_output"]]%>%
+      mutate(Year=as.integer(format(Date,"%Y")))%>%
+      dplyr::select(-Date)%>%
+      group_by(Year)%>%
+      summarise_all(.funs = sum,na.rm=T)%>%
+      mutate(temp=temp/12,LAI=LAI/12,uztwc=uztwc/12,	uzfwc=uzfwc/12,
+             lztwc=lztwc,	lzfpc=lzfpc/12,	lzfsc=lzfsc/12)%>%
+      dplyr::select(Year,prcp,rain,temp,LAI,PET,PET_hamon, aetTot,
+                    flwTot, flwSurface, flwBase,everything())
+    annual_output%>%
+      write.csv(paste0("www/tmp/Output_outlet_annual_TS.csv"),row.names=F)
+    # save annual station annual output the result list
+    resultOutput[["Output_station_annual"]]<<-annual_output
+
+    incProgress(0.1, detail = paste("saving data for each HUC!"))
+    # Process output for each HUC
+    f_ReshapebyBasinID<-function(da,BasinIDs,seq_dates){
+      out<- da%>%
+        do.call(what = rbind)%>%
+        as.data.frame()
+      names(out)<-BasinIDs
+      out[["Date"]]=seq_dates
+      out[["Variable"]]=rep(names(da),each=length(seq_dates))
+      return(out)
+    }
+
+    BasinIDs<-data_simulation$BasinID
+    seq_dates<-seq(Sim_dates$Start,Sim_dates$End,by="month")
+
+    ## basin monthly output
+    .a<-f_ReshapebyBasinID(da=resultOutput[["Basin_output"]],
+                           BasinIDs=BasinIDs,
+                           seq_dates=seq_dates)
+    Output_BasinID<-.a%>%
+      melt(id=c("Date","Variable"))%>%
+      rename(BasinID=variable)%>%
+      mutate(BasinID=as.integer(as.character(BasinID)))%>%
+      dcast(BasinID+Date~Variable)%>%
+      dplyr::select(BasinID,Date,prcp,rain,temp,LAI,PET,PET_hamon, aetTot,
+                    flwTot, flwSurface, flwBase,everything())
+    Output_BasinID%>%
+      write.csv(paste0("www/tmp/Output_BasinID_monthly_TS.csv"),row.names=F)
+    resultOutput[["Output_Basin_monthly"]]<<- Output_BasinID
+
+    ## basin annual output
+    Output_BasinID_ann<- Output_BasinID%>%
+      mutate(Year=as.integer(format(Date,"%Y")))%>%
+      dplyr::select(-Date)%>%
+      group_by(BasinID,Year)%>%
+      summarise_all(.funs = sum,na.rm=T)%>%
+      mutate(temp=temp/12,LAI=LAI/12,uztwc=uztwc/12,	uzfwc=uzfwc/12,
+             lztwc=lztwc,	lzfpc=lzfpc/12,	lzfsc=lzfsc/12)%>%
+      dplyr::select(BasinID,Year,prcp,rain,temp,LAI,PET,PET_hamon, aetTot,
+                    flwTot, flwSurface, flwBase,everything())
+    Output_BasinID_ann%>%
+      write.csv(paste0("www/tmp/Output_BasinID_annual_TS.csv"),row.names=F)
+    resultOutput[["Output_Basin_annual"]]<<- Output_BasinID_ann
+
+    ## basin long term annual avg output
+    Output_BasinID_avg<-Output_BasinID_ann%>%
+      dplyr::select(-Year)%>%
+      group_by(BasinID)%>%
+      summarise_all(.funs = mean,na.rm=T)
+
+    Output_BasinID_avg%>%
+      write.csv(paste0("www/tmp/Output_BasinID_avg.csv"),row.names=F)
+    resultOutput[["Output_Basin_avg"]]<<- Output_BasinID_avg
+
+    incProgress(0.1, detail = paste("saving data for each Land cover!"))
+    # Process output for each land cover
+    f_ReshapebyLc<-function(da,Lcs,Output_BasinID){
+      out<- da%>%
+        do.call(what = rbind)%>%
+        as.data.frame()
+      names(out)<-Lcs
+      out<-cbind(Output_BasinID[c("BasinID","Date")],out)
+      return(out)
+    }
+    Lcs<-paste0("Lc_",c(1:9))
+
+    for(var in names(resultOutput[["lc_output"]])){
+      lc_mon_output<-f_ReshapebyLc(da=resultOutput[["lc_output"]][[var]],
+                                   Lcs=Lcs,
+                                   Output_BasinID=Output_BasinID)
+      resultOutput[["Output_lc_monthly"]]<<- lc_mon_output
+      lc_mon_output%>%
+        write.csv(paste0("www/tmp/Output_Lc_monthly_TS_",var,".csv"),row.names=F)
+
+      dd_mon<-lc_mon_output%>%
+        mutate(Year=as.integer(format(Date,"%Y")))%>%
+        dplyr::select(-Date)
+      if(var %in% c("aetTot","flwTot","flwSurface","flwBase","PET")){
+        dd_ann<-dd_mon %>%
+          group_by(BasinID,Year) %>%
+          summarise_all(.funs = sum)
+        dd_ann%>%
+          write.csv(paste0("www/tmp/Output_Lc_annual_TS_",var,".csv"),row.names=F)
+
+        dd_ann %>%
+          group_by(BasinID) %>%
+          dplyr::select(-Year)%>%
+          summarise_all(.funs = mean)%>%
+          write.csv(paste0("www/tmp/Output_Lc_avg_",var,".csv"),row.names=F)
+      }else{
+        dd_mon %>%
+          group_by(BasinID,Year) %>%
+          summarise_all(.funs = mean)%>%
+          write.csv(paste0("www/tmp/Output_Lc_annual_TS_",var,".csv"),row.names=F)
+
+        dd_mon %>%
+          group_by(BasinID) %>%
+          dplyr::select(-Year)%>%
+          summarise_all(.funs = mean)%>%
+          write.csv(paste0("www/tmp/Output_Lc_avg_",var,".csv"),row.names=F)
+      }
+
+    }
+
+    # save the reshsaped whole result list
+    save(resultOutput,file="www/tmp/resultOutput_final.Rdata")
+
+    f_addinfo("simulating","Finished saving temp output! ^_^")
+    })
     print("Finished!")
 
 })
@@ -847,7 +993,7 @@ shinyServer(function(input, output,session) {
     resultOutput[["Station_output"]]%>%
       dplyr::select(Date,prcp,rain,temp,LAI,PET,PET_hamon, aetTot,
                     flwTot, flwSurface, flwBase,everything())%>%
-      write.csv(paste0("www/output/Output_outlet_monthly_TS.csv"),row.names=F)
+      write.csv(paste0("www/tmp/Output_outlet_monthly_TS.csv"),row.names=F)
 
     annual_output<-resultOutput[["Station_output"]]%>%
       mutate(Year=as.integer(format(Date,"%Y")))%>%
@@ -860,7 +1006,7 @@ shinyServer(function(input, output,session) {
                     flwTot, flwSurface, flwBase,everything())
     resultOutput[["Output_station_annual"]]<<-annual_output
     annual_output%>%
-      write.csv(paste0("www/output/Output_outlet_annual_TS.csv"),row.names=F)
+      write.csv(paste0("www/tmp/Output_outlet_annual_TS.csv"),row.names=F)
 
     # Process output for each HUC
    f_ReshapebyBasinID<-function(da,BasinIDs,seq_dates){
@@ -887,7 +1033,7 @@ shinyServer(function(input, output,session) {
                    flwTot, flwSurface, flwBase,everything())
     resultOutput[["Output_Basin_monthly"]]<<- Output_BasinID
     Output_BasinID%>%
-        write.csv(paste0("www/output/Output_BasinID_monthly_TS.csv"),row.names=F)
+        write.csv(paste0("www/tmp/Output_BasinID_monthly_TS.csv"),row.names=F)
 
     Output_BasinID_ann<- Output_BasinID%>%
       mutate(Year=as.integer(format(Date,"%Y")))%>%
@@ -900,7 +1046,7 @@ shinyServer(function(input, output,session) {
                     flwTot, flwSurface, flwBase,everything())
     resultOutput[["Output_Basin_annual"]]<<- Output_BasinID_ann
     Output_BasinID_ann%>%
-      write.csv(paste0("www/output/Output_BasinID_annual_TS.csv"),row.names=F)
+      write.csv(paste0("www/tmp/Output_BasinID_annual_TS.csv"),row.names=F)
 
     Output_BasinID_avg<-Output_BasinID_ann%>%
       dplyr::select(-Year)%>%
@@ -908,7 +1054,7 @@ shinyServer(function(input, output,session) {
       summarise_all(.funs = mean,na.rm=T)
     resultOutput[["Output_Basin_avg"]]<<- Output_BasinID_avg
     Output_BasinID_avg%>%
-      write.csv(paste0("www/output/Output_BasinID_avg.csv"),row.names=F)
+      write.csv(paste0("www/tmp/Output_BasinID_avg.csv"),row.names=F)
 
     # Process output for each land cover
     f_ReshapebyLc<-function(da,Lcs,Output_BasinID){
@@ -927,7 +1073,7 @@ shinyServer(function(input, output,session) {
                   Output_BasinID=Output_BasinID)
       resultOutput[["Output_lc_monthly"]]<<- lc_mon_output
       lc_mon_output%>%
-        write.csv(paste0("www/Output/Output_Lc_monthly_TS_",var,".csv"),row.names=F)
+        write.csv(paste0("www/tmp/Output_Lc_monthly_TS_",var,".csv"),row.names=F)
 
       dd_mon<-lc_mon_output%>%
         mutate(Year=as.integer(format(Date,"%Y")))%>%
@@ -937,31 +1083,31 @@ shinyServer(function(input, output,session) {
           group_by(BasinID,Year) %>%
           summarise_all(.funs = sum)
         dd_ann%>%
-          write.csv(paste0("www/Output/Output_Lc_annual_TS_",var,".csv"),row.names=F)
+          write.csv(paste0("www/tmp/Output_Lc_annual_TS_",var,".csv"),row.names=F)
 
         dd_ann %>%
           group_by(BasinID) %>%
           dplyr::select(-Year)%>%
           summarise_all(.funs = mean)%>%
-          write.csv(paste0("www/Output/Output_Lc_avg_",var,".csv"),row.names=F)
+          write.csv(paste0("www/tmp/Output_Lc_avg_",var,".csv"),row.names=F)
       }else{
         dd_mon %>%
           group_by(BasinID,Year) %>%
           summarise_all(.funs = mean)%>%
-          write.csv(paste0("www/Output/Output_Lc_annual_TS_",var,".csv"),row.names=F)
+          write.csv(paste0("www/tmp/Output_Lc_annual_TS_",var,".csv"),row.names=F)
 
         dd_mon %>%
           group_by(BasinID) %>%
           dplyr::select(-Year)%>%
           summarise_all(.funs = mean)%>%
-          write.csv(paste0("www/Output/Output_Lc_avg_",var,".csv"),row.names=F)
+          write.csv(paste0("www/tmp/Output_Lc_avg_",var,".csv"),row.names=F)
       }
 
 
     }
     print("Finished processing the output!")
     f_addinfo("simulplotting",
-              paste0("The simulated result has been save to default foler 'www/output'"))
+              paste0("The simulated result has been save to default foler 'www/tmp'"))
 
   })
 
@@ -1041,9 +1187,11 @@ WaSSI<-function(hru,datain,sim.dates){
     }
   }
 
+  # Set the min PET of Hamon or Sun PET as the PET
+  hru_lc_pet<- apply(hru_lc_pet,2,function(x) apply(cbind(x,hru_pet),1,min))
+
   # calculate flow based on PET and SAC-SMA model
   hru_lc_out <-apply(hru_lc_pet,2,sacSma_mon,par = par.sacsma, prcp = hru_rain)
-
 
   # Calculate Carbon based on WUE for each vegetation type
   if(!is.null(WUE.coefs)){
