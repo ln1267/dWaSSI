@@ -53,6 +53,41 @@ f_paste<-function(x,y,sep=""){
   }
 }
 
+f_sta_shp_nc_new<-function(ncfilename,basin,fun="mean",varname,zonal_field,yr.start,scale="1 month",weight=T,plot=T){
+  require(dplyr)
+  require(raster)
+  require(tidyr)
+  require(sp)
+  da<-brick(ncfilename)
+  if (!compareCRS(basin,da))  basin<-spTransform(basin,crs(da))
+  da<-crop(da,basin)
+
+  if(plot) {
+    plot(da[[1]],basin)
+    plot(basin,add=T)
+  }
+
+  beginCluster()
+  basin_r<-rasterize(basin,da[[1]],field=zonal_field)
+  endCluster()
+
+  dates<-seq(as.Date(paste0(yr.start,"-01-01")),by=scale,length.out = dim(da)[3])
+
+  da_matrix<-cbind(values(basin_r),values(da))
+  colnames(da_matrix)<-c("BasinID",as.character(dates))
+
+  da_sta<-da_matrix%>%
+      as.data.frame()%>%
+      filter(!is.na(BasinID))%>%
+      group_by(BasinID)%>%
+      summarise_all(.funs = fun,na.rm=T)%>%
+      melt(id="BasinID")%>%
+      rename(Date=variable)%>%
+      mutate(Date=as.Date(Date))
+  names(da_sta)[3]<-varname
+  names(da_sta)[1]<-zonal_field
+  return(da_sta)
+}
 
 f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,yr.start,scale="month",weight=T,plot=T){
   require(dplyr)
@@ -67,11 +102,14 @@ f_sta_shp_nc<-function(ncfilename,basin,fun="mean",varname,zonal_field,yr.start,
     plot(da[[1]],basin)
     plot(basin,add=T)
   }
+
+  beginCluster()
   if(fun=="mean" | fun=="Mean" | fun=="MEAN"){
     ex <- raster::extract(da, basin, fun=mean, na.rm=TRUE, weights=weight)
   }else{
     ex <- raster::extract(da, basin, fun=sum, na.rm=TRUE)
   }
+  endCluster()
 
   if(scale=="month" | scale=="Month" | scale=="MONTH"){
     dates<-seq(as.Date(paste0(yr.start,"-01-01")),by="1 month",length.out = dim(da)[3])
@@ -158,7 +196,11 @@ hru_lc_zonal<-function(classname,daname,shp,fun='mean',field=NULL,plot=T){
     da1<-crop(da,polygon1)
     if (!compareCRS(polygon1,class1)) polygon1<-spTransform(polygon1,crs(class1))
     polygon1<-spTransform(polygon1,crs(class1))
-    if(!sum(res(da1)==res(class1))==2) da1<-projectRaster(da1,class1,method='ngb')
+    if(!sum(res(da1)==res(class1))==2){
+      beginCluster()
+      da1<-projectRaster(da1,class1,method='ngb')
+      endCluster()
+    }
     if(!extent(class1)==extent(da1)) extent(class1)=extent(da1)
     class1<-raster::mask(class1,polygon1)
     da1<-raster::mask(da1,polygon1)
@@ -199,6 +241,29 @@ hru_lc_zonal<-function(classname,daname,shp,fun='mean',field=NULL,plot=T){
   return(da_zonal)
 }
 
+hru_lc_ratio_new<-function(classname,shp,field=NULL){
+  library(raster)
+  require(sp)
+
+  class<-raster(classname)
+  if (!compareCRS(shp,class)) shp<-spTransform(shp,crs(class))
+  beginCluster()
+  shp_r<-rasterize(shp,class,field="BasinID")
+  endCluster()
+
+  class_ratio<-data.frame("BasinID"=values(shp_r),"Class"=values(class))%>%
+    filter(!is.na(BasinID))%>%
+    group_by(BasinID,Class)%>%
+    summarise(n=n())%>%
+    dcast(BasinID~Class)
+  names(class_ratio)<-c("BasinID",paste0("Lc_",names(class_ratio)[-1]))
+  class_ratio[is.na(class_ratio)]<-0
+  Sum_n<-apply(class_ratio[,-1], 1,sum)
+  for (i in c(2:ncol(class_ratio))) class_ratio[,i]<-round(class_ratio[,i]/Sum_n,3)
+
+  return(class_ratio)
+}
+
 hru_lc_ratio<-function(classname,shp,field=NULL,mcores=1){
   library(raster)
   require(sp)
@@ -210,7 +275,7 @@ hru_lc_ratio<-function(classname,shp,field=NULL,mcores=1){
   print(table(matrix(class)))
 
   # zonal_for each polygon
-  f_zonal<-function(i){
+  f_zonal<-function(i,shp=shp,class=class){
     polygon1<-shp[i,]
     class1<-crop(class,polygon1)
     class_ratio<-as.data.frame(table(matrix(class1))/sum(table(matrix(class1))))
@@ -223,7 +288,15 @@ hru_lc_ratio<-function(classname,shp,field=NULL,mcores=1){
 
   # Run sta
   if(length(shp)>1){
-    lc_ratio<- mclapply(c(1:length(shp)), f_zonal,mc.cores=mcores)
+    if(.Platform$OS.type=="windows"){
+      # cl<-makeCluster(mcores, type="SOCK")
+      # clusterExport(cl, c("shp","class","f_zonal"))
+      # result<-clusterApply(cl,c(1:length(shp)), f_zonal,shp=shp,class=class)
+      # stopCluster(cl)
+      lc_ratio<- lapply(c(1:length(shp)), f_zonal,shp=shp,class=class)
+    }else{
+    lc_ratio<- mclapply(c(1:length(shp)), f_zonal,shp=shp,class=class,mc.cores=mcores)
+    }
     lc_ratio<-do.call(rbind,lc_ratio)
   }else{
     class_ratio<-as.data.frame(table(matrix(class))/sum(table(matrix(class))))
@@ -236,6 +309,51 @@ hru_lc_ratio<-function(classname,shp,field=NULL,mcores=1){
 
   return(lc_ratio)
 }
+
+f_landlai_new<-function(lcfname,laifname,Basins,byfield,yr.start,scale="1 month"){
+
+  require(raster)
+  require(sp)
+  # read the class and data by their names
+  lcclass<-raster(lcfname)
+  da<-brick(laifname)
+  if(sum(res(da)==res(lcclass))==2) crs(da)<-crs(lcclass)
+  # crop data based on the input shp
+  if (!compareCRS(Basins,da)) Basins<-spTransform(Basins,crs(da))
+  da<-crop(da,Basins)
+
+  if (!compareCRS(Basins,lcclass)) shp<-spTransform(Basins,crs(lcclass))
+  lcclass<-crop(lcclass,Basins)
+
+  beginCluster()
+  Basins_r<-rasterize(Basins,lcclass,field=byfield)
+  endCluster()
+
+  da_matrix<-cbind(values(Basins_r),values(lcclass),values(da))
+  dates<-seq(as.Date(paste0(yr.start,"-01-01")),by=scale,length.out = dim(da)[3])
+  colnames(da_matrix)<-c("BasinID","Class",as.character(dates))
+
+  hru_lais<-da_matrix%>%
+    as.data.frame()%>%
+    filter(!is.na(BasinID))%>%
+    mutate(Class=paste0("Lc_",as.integer(as.character(Class))))%>%
+    group_by(BasinID,Class)%>%
+    summarise_all(.funs = "mean",na.rm=T)%>%
+    melt(id=c("BasinID","Class"))%>%
+    rename(Date=variable,LAI=value)%>%
+    mutate(Date=as.Date(Date))%>%
+    mutate(Year=as.integer(format(Date,"%Y")),
+         Month=as.integer(format(Date,"%m")))%>%
+    dplyr::select(BasinID,Year,Month,Class,LAI)%>%
+    dcast(BasinID+Year+Month~Class)%>%
+    arrange(BasinID,Year,Month)
+
+  hru_lais[is.na(hru_lais)]<-0
+  names(hru_lais)[1]<-byfield
+  return(hru_lais)
+
+}
+
 
 # this function is used for zonal LAI of each lc in the HRU
 f_landlai<-function(lcfname,laifname,Basins,byfield,yr.start){
@@ -272,16 +390,31 @@ f_cellinfo<-function(classfname,Basins,byfield="BasinID",demfname=NULL){
   require(tidyr)
   require(dplyr)
   require(raster)
-  hru_lcs<-hru_lc_ratio(classname =classfname,
+  # hru_lcs<-hru_lc_ratio(classname =classfname,
+  #                       shp = Basins,
+  #                       field = byfield)%>%
+  #   mutate(Class=paste0("Lc_",Class))%>%
+  #   dplyr::select(-Count)%>%
+  #   spread(Class, Ratio,fill=0)
+  hru_lcs<-hru_lc_ratio_new(classname =classfname,
                         shp = Basins,
-                        field = byfield)%>%
-    mutate(Class=paste0("Lc_",Class))%>%
-    dplyr::select(-Count)%>%
-    spread(Class, Ratio,fill=0)
-
+                        field = byfield)
+  print("getting elevation for each HUC")
   if(!"Elev_m" %in% names(Basins) & !is.null(demfname)){
     dem<-raster(demfname)
-    .a<-raster::extract(dem,Basins,df=T,fun=mean,na.rm=T,weight=T)
+    # beginCluster()
+    # .a<-raster::extract(dem,Basins,df=T,fun=mean,na.rm=T,weight=T)
+    # endCluster()
+    #
+    if (!compareCRS(Basins,dem)) Basins<-spTransform(Basins,crs(dem))
+    beginCluster()
+    Basins_r<-rasterize(Basins,dem,field="BasinID")
+    endCluster()
+
+    .a<-data.frame("BasinID"=values(Basins_r),"dem"=values(dem))%>%
+      filter(!is.na(BasinID))%>%
+      group_by(BasinID)%>%
+      summarise(dem=mean(dem,na.rm=T))
     Basins$Elev_m<-round(.a[,2],2)
   }
 
@@ -709,6 +842,7 @@ librs<-c("dplyr","zip","lubridate","raster","ggplot2","leaflet","rgdal","rgeos",
 f_lib_check(librs)
 
 if(!exists("data_input")) data_input<-list()
+if(!exists("BasinShp")) BasinShp<-NULL
 Ning<-"Ning Liu"
 if(!exists("data_simulation")) data_simulation<-list()
 if(!exists("Sim_dates")) Sim_dates<-list()
