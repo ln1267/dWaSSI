@@ -431,6 +431,33 @@ f_cellinfo<-function(classfname,Basins,byfield="BasinID",demfname=NULL){
 
   return(cellinfo)
 }
+
+hru_lc_imp<-function(impname,classname,shp,byfield=NULL){
+  library(raster)
+  require(sp)
+
+  class<-raster(classname)
+  imp<-raster(impname)
+  if (!compareCRS(shp,class)) shp<-spTransform(shp,crs(class))
+  class<-crop(class,shp)
+
+  beginCluster()
+  imp<- projectRaster(imp,class)
+  shp_r<-rasterize(shp,class,field=byfield)
+  endCluster()
+
+  lc_imp<-data.frame("BasinID"=values(shp_r),"Class"=values(class),imp=values(imp))%>%
+    filter(!is.na(BasinID))%>%
+    group_by(BasinID,Class)%>%
+    summarise(imp=mean(imp,na.rm=T))%>%
+    dcast(BasinID~Class)
+  names(lc_imp)<-c(byfield,paste0("Lc_",names(lc_imp)[-1]))
+  lc_imp[is.na(lc_imp)]<-0
+
+  return(lc_imp)
+}
+
+
 f_soilinfo<-function(soilfname,Basins){
   SOIL<-brick(soilfname)
   Basins<-spTransform(Basins,crs(SOIL))

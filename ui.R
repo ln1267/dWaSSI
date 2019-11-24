@@ -107,6 +107,7 @@ shinyUI(
                  fileInput('Input_lai_raster', 'Choose monthly LAI raster file', multiple=FALSE, accept="tif"),
                  checkboxInput("updateSoil", "Update", FALSE),
                  fileInput('Input_soil_raster', 'Choose Soil raster file', multiple=FALSE, accept="tif"),
+                 checkboxInput("updateImp", "Update", FALSE),
                  fileInput('Input_imp_raster', 'Choose impverious raster file [Optional]', multiple=FALSE, accept="tif")
 
                ),

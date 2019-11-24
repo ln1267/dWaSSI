@@ -76,8 +76,8 @@ shinyServer(function(input, output,session) {
     inforprint$processing<-"Processing log: "
     f_addinfo("processing","Reading shapfile ...")
     Basins<- readOGR(input$Input_basin$datapath)
-    Basins$BasinID<-c(1:length(Basins[,1]))
-
+    if (!"BasinID" %in% names(Basins)) Basins$BasinID<-c(1:length(Basins[,1]))
+    if (is.factor(Basins$BasinID)) Basins$BasinID<-as.integer(as.character(Basins$BasinID))
     # Add latitude and longitude infor to the Basin
     if(!"Latitude"  %in% names(Basins)) {
 
@@ -132,10 +132,14 @@ shinyServer(function(input, output,session) {
 
       f_addinfo("processing","Processing climate data ...")
       print("Processsing Climate data ...")
-      Tmean_catchment<-f_sta_shp_nc(input$Input_temp_raster$datapath,BasinShp,varname = "Tavg_C",yr.start = input$yearStartClimate,zonal_field = "BasinID")
-      Pre_catchment<-f_sta_shp_nc(input$Input_precp_raster$datapath,BasinShp,varname = "Ppt_mm",yr.start = input$yearStartClimate,zonal_field = "BasinID")
+      # Tmean_catchment<-f_sta_shp_nc(input$Input_temp_raster$datapath,BasinShp,varname = "Tavg_C",yr.start = input$yearStartClimate,zonal_field = "BasinID")
+      # Pre_catchment<-f_sta_shp_nc(input$Input_precp_raster$datapath,BasinShp,varname = "Ppt_mm",yr.start = input$yearStartClimate,zonal_field = "BasinID")
+      Tmean_catchment<-f_sta_shp_nc_new(input$Input_temp_raster$datapath,BasinShp,varname = "Tavg_C",yr.start = input$yearStartClimate,zonal_field = "BasinID")
+      Pre_catchment<-f_sta_shp_nc_new(input$Input_precp_raster$datapath,BasinShp,varname = "Ppt_mm",yr.start = input$yearStartClimate,zonal_field = "BasinID")
+
       climate<-Pre_catchment%>%
         mutate(Tavg_C=Tmean_catchment$Tavg_C)%>%
+        mutate(Year=as.integer(format(Date,"%Y")),Month=as.integer(format(Date,"%m")))%>%
         arrange(BasinID,Year,Month)%>%
         mutate(Ppt_mm=round(Ppt_mm,3))%>%
         mutate(Tavg_C=round(Tavg_C,3))%>%
@@ -177,11 +181,16 @@ shinyServer(function(input, output,session) {
       incProgress(0.2, detail = paste("Lai data ...!"))
       laifname<-input$Input_lai_fpath
       if(laifname=="~")  laifname<-input$Input_lai_raster$datapath
-      laiinfo<-f_landlai(lcfname=input$Input_lc_raster$datapath,
-                          laifname=laifname,
-                          Basins=BasinShp,
-                          byfield="BasinID",
-                          yr.start=input$yearStartLai)
+      # laiinfo<-f_landlai(lcfname=input$Input_lc_raster$datapath,
+      #                     laifname=laifname,
+      #                     Basins=BasinShp,
+      #                     byfield="BasinID",
+      #                     yr.start=input$yearStartLai)
+      laiinfo<-f_landlai_new(lcfname=input$Input_lc_raster$datapath,
+                         laifname=laifname,
+                         Basins=BasinShp,
+                         byfield="BasinID",
+                         yr.start=input$yearStartLai)
       data_input[["LAI"]]<<-laiinfo
       print("Finished processsing LAI data ...")
       f_addinfo("processing","Finished processing Lai data!")
@@ -199,9 +208,29 @@ shinyServer(function(input, output,session) {
       soilinfo<-f_soilinfo(soilfname=input$Input_soil_raster$datapath,
                           Basins=BasinShp)
       data_input[["Soilinfo"]]<<-soilinfo
-      print("Finished processsing LAI data ...")
+      print("Finished processsing Soil info data ...")
       f_addinfo("processing","Finished processing Soil data!")
     }
+
+    # process Imp input
+    if(is.null(input$Input_imp_raster) | is.null(input$Input_lc_raster)){
+      f_addinfo("processing","Warning: Both impervious and vegetation data are needed!")
+
+    }else if("Impinfo" %in% names(data_input) & ! input$updateImp){
+      f_addinfo("processing","Warning: Impervious data has been processed!")
+
+    }else{
+      print("Processing Impervious")
+      incProgress(0.2, detail = paste("Impervious data ...!"))
+      Impinfo<-hru_lc_imp(impname = input$Input_imp_raster$datapath,
+                          classname = input$Input_lc_raster$datapath,
+                          shp =BasinShp,
+                           byfield ="BasinID")
+      data_input[["Impinfo"]]<<-Impinfo
+      print("Finished processsing Impervious data ...")
+      f_addinfo("processing","Finished processing Soil data!")
+    }
+
     # Print the summary of the input
       output$prntraster<-renderPrint({
         if(length(data_input)<1) return("No data!")
@@ -220,6 +249,8 @@ shinyServer(function(input, output,session) {
   ## PlotAction: Plot Basin and raster data  ----
       observeEvent(input$plotrasterdata,{
 
+        withProgress(message = 'In process ...', value = 0,{
+        incProgress(0.1, detail = paste("reading data..."))
         Tmean_avg<-NULL
         Pre_avg<-NULL
         Lai_avg<-NULL
@@ -261,7 +292,7 @@ shinyServer(function(input, output,session) {
           endCluster()
         }
 
-
+        incProgress(0.4, detail = paste("ploting ..."))
       output$basinrastermap <- renderLeaflet({
         input$plotrasterdata
         # Plot the BasinShp
@@ -359,7 +390,7 @@ shinyServer(function(input, output,session) {
           )
 
       })
-
+    })
   })
 
 
