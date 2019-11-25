@@ -1162,7 +1162,7 @@ shinyServer(function(input, output,session) {
     # the argument 'file'.
     content = function(fname) {
 
-      fs=dir("www/output/","csv",full.names = T)
+      fs=dir("www/tmp/","csv",full.names = T)
 
       withProgress(message = 'Compressing files ...', value = 0.5,{
         zip::zipr(zipfile=fname,files=fs)
@@ -1176,95 +1176,3 @@ shinyServer(function(input, output,session) {
 
   } # END
 )
-
-
-# WaSSI for each HRU and calculate adjust temp and pet values
-WaSSI<-function(hru,datain,sim.dates){
-  require(dplyr)
-  library(tidyr)
-
-  # Set the input variables
-  hru_prcp<-subset(datain$Climate,BasinID==hru)$Ppt_mm[sim.dates$climate_index]
-  hru_tavg<-subset(datain$Climate,BasinID==hru)$Tavg_C[sim.dates$climate_index]
-  NoLcs<-length(names(datain[["LAI"]]))-3
-  hru_lat<-subset(datain$Cellinfo,BasinID==hru)$Latitude
-  jdate<-sim.dates$jdate
-  days_mon<-sim.dates$dateDays
-  hru.lc.lai<-subset(datain$LAI,BasinID==hru)[sim.dates$lai_index,-c(1:3)]
-  par.sacsma<-unlist(subset(datain$Soilinfo,BasinID==hru)[-c(1)])
-  names(par.sacsma)<-toupper(names(par.sacsma))
-  huc.lc.ratio<-unlist(subset(datain$Cellinfo,BasinID==hru)[grep("Lc",names(datain$Cellinfo))])
-
-  ET.coefs<-datain$ET_coefs
-  WUE.coefs<-datain$WUE_coefs
-
-  # Using snowmelt function to calculate effective rainfall and snowmelt
-  snow.result<-snow_melt(ts.prcp = hru_prcp,ts.temp = hru_tavg,snowrange = c(-5,1))
-  hru_rain <- snow.result$prcp
-
-  # PET using Hamon equation
-  hru_pet <- hamon(par = 1, tavg = hru_tavg, lat = hru_lat, jdate = jdate)
-  hru_pet<-hru_pet*days_mon
-
-  # Calculate hru flow for each elevation band
-  # Calculate PET_Sun based on LAI
-  if(is.null(ET.coefs)){
-    hru_lc_pet<-hru_pet*hru.lc.lai*0.0222+0.174*hru_rain+0.502*hru_pet+5.31*hru.lc.lai
-  }else{
-    # Calculate the PET_Sun based on user defined model
-    hru_lc_pet<-matrix(NA,nrow =length(hru_pet), ncol=NoLcs)
-    for (i in c(1:NoLcs)){
-      hru_lc_pet[,i]<- ET.coefs[i,"Intercept"] +
-        ET.coefs[i,"P_coef"]*hru_rain+
-        ET.coefs[i,"PET_coef"]*hru_pet+
-        ET.coefs[i,"LAI_coef"]*hru.lc.lai[[i]]+
-        ET.coefs[i,"P_PET_coef"]*hru_rain*hru_pet +
-        ET.coefs[i,"P_LAI_coef"]*hru_rain*hru.lc.lai[[i]] +
-        ET.coefs[i,"PET_LAI_coef"] *hru_pet*hru.lc.lai[[i]]
-    }
-  }
-
-  # Set the min PET of Hamon or Sun PET as the PET
-  hru_lc_pet<- apply(hru_lc_pet,2,function(x) apply(cbind(x,hru_pet),1,min))
-
-  # calculate flow based on PET and SAC-SMA model
-  hru_lc_out <-apply(hru_lc_pet,2,sacSma_mon,par = par.sacsma, prcp = hru_rain)
-
-  # Calculate Carbon based on WUE for each vegetation type
-  if(!is.null(WUE.coefs)){
-    for (i in c(1:NoLcs)){
-      hru_lc_out[["GEP"]][[i]]<-hru_lc_out[["totaet"]][[i]] *WUE.coefs$WUE[i]
-      hru_lc_out[["RECO"]][[i]]<-WUE.coefs$RECO_Intercept[i] + hru_lc_out[[i]][["GEP"]] *WUE.coefs$RECO_Slope[i]
-      hru_lc_out[["NEE"]][[i]] <-hru_lc_out[["RECO"]][[i]]-hru_lc_out[["GEP"]][[i]]
-    }
-  }
-  # Add LAI and PET to each land cover and subset the target period
-  for (i in c(1:NoLcs)){
-    hru_lc_out[[i]][["LAI"]]<-hru.lc.lai[[i]]
-    hru_lc_out[[i]][["PET"]]<-hru_lc_pet[,i]
-    hru_lc_out[[i]][["Date"]]<-sim.dates$Seq_date
-    hru_lc_out[[i]]<-hru_lc_out[[i]]%>%filter(Date>=sim.dates$Start) %>% dplyr::select(-Date)
-  }
-
-  # combin all the input
-  hru_in<-data.frame(Date=sim.dates$Seq_date,
-                     prcp=hru_prcp,
-                     temp = hru_tavg,
-                     rain=hru_rain,
-                     snowpack=snow.result$snowpack,
-                     snowmelt=snow.result$snowmelt,
-                     PET_hamon=hru_pet)%>%
-    filter(Date>=sim.dates$Start)%>%
-    dplyr::select(-Date)
-
-  # process data for each lc
-  vars<-names(hru_lc_out[[1]])
-  #vars<-vars[1:(length(vars)-1)]
-  hru_lc_out<-lapply(vars, function(x) sapply(hru_lc_out, "[[", x))
-  names(hru_lc_out)<-vars
-  hru_out<-sapply(hru_lc_out, function(x) apply(x, 1, weighted.mean,huc.lc.ratio) )
-  #colnames(hru_out)<-vars
-  #hru_lc_out$Date<-hru_in$Date
-  hru_in<-cbind(hru_in,hru_out)
-  return(list(output=hru_in,lc_output=hru_lc_out))
-}
