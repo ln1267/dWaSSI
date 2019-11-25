@@ -910,7 +910,7 @@ shinyServer(function(input, output,session) {
       out<-cbind(Output_BasinID[c("BasinID","Date")],out)
       return(out)
     }
-    Lcs<-paste0("Lc_",c(1:9))
+    Lcs<-names(data_input$LAI)[-c(1:3)]
 
     for(var in names(resultOutput[["lc_output"]])){
       lc_mon_output<-f_ReshapebyLc(da=resultOutput[["lc_output"]][[var]],
