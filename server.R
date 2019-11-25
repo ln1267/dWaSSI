@@ -596,13 +596,14 @@ shinyServer(function(input, output,session) {
 
     Sim_dates[["Start"]]<<-as.Date(format(input$dateSimulation[1],"%Y-%m-01"))
     Sim_dates[["End"]]<<-as.Date(format(input$dateSimulation[2],"%Y-%m-01"))
+
     # Only use year of the input
     # Sim_dates[["Start"]]<<-as.Date(paste0(format(input$dateSimulation[1],"%Y"),"-01-01"))
     # Sim_dates[["End"]]<<-as.Date(paste0(format(input$dateSimulation[2],"%Y"),"-12-01"))
     Sim_dates[["Seq_date"]]<<-seq.Date((Sim_dates[["Start"]]-years(warmup)),Sim_dates[["End"]],by = "month")
 
     climate_sel<-data_input[["Climate"]]%>%
-      filter(BasinID==1)%>%
+      filter(BasinID==unique(BasinID)[1])%>%
       mutate(Date=as.Date(paste0(Year,"-",Month,"-","01")))
     daterange_climate<-range(climate_sel$Date)
     # Check the input dataset
@@ -618,7 +619,7 @@ shinyServer(function(input, output,session) {
 
     # LAI time range
     lai_sel<-data_input[["LAI"]]%>%
-      filter(BasinID==1)%>%
+      filter(BasinID==unique(BasinID)[1])%>%
       mutate(Date=as.Date(paste0(Year,"-",Month,"-","01")))
     daterange_lai<-range(lai_sel$Date)
     Sim_dates[["Start_lai"]]<<-daterange_lai[1]
@@ -707,8 +708,13 @@ shinyServer(function(input, output,session) {
         dplyr::select(-Year)
       datesGap<-NULL
       if(min(Sim_dates[["Seq_date"]])<Sim_dates[["Start_lai"]]) datesGap<-seq(min(Sim_dates[["Seq_date"]]),(Sim_dates[["Start_lai"]]-months(1)),by="month")
-      if(max(Sim_dates[["Seq_date"]])>Sim_dates[["End_lai"]]) datesGap<-c(datesGap,seq((Sim_dates[["End_lai"]]+months(1)),max(Sim_dates[["Seq_date"]]),by="month"))
-
+      if(max(Sim_dates[["Seq_date"]])>Sim_dates[["End_lai"]]) {
+        if(is.null(datesGap)){
+          datesGap<-seq((Sim_dates[["End_lai"]]+months(1)),max(Sim_dates[["Seq_date"]]),by="month")
+        }else{
+          datesGap<-c(datesGap,seq((Sim_dates[["End_lai"]]+months(1)),max(Sim_dates[["Seq_date"]]),by="month"))
+        }
+      }
       LAI_filled<-data.frame("BasinID"=rep(BasinID_sel,each=length(datesGap)),
                              "Date"=datesGap)%>%
         mutate(Year=as.integer(format(Date,"%Y")),
