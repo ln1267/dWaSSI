@@ -58,6 +58,7 @@ f_sta_shp_nc_new<-function(ncfilename,basin,fun="mean",varname,zonal_field,yr.st
   require(raster)
   require(tidyr)
   require(sp)
+  require(reshape2)
   da<-brick(ncfilename)
   if (!compareCRS(basin,da))  basin<-spTransform(basin,crs(da))
   da<-crop(da,basin)
@@ -80,10 +81,25 @@ f_sta_shp_nc_new<-function(ncfilename,basin,fun="mean",varname,zonal_field,yr.st
       as.data.frame()%>%
       filter(!is.na(BasinID))%>%
       group_by(BasinID)%>%
-      summarise_all(.funs = fun,na.rm=T)%>%
+      summarise_all(.funs = fun,na.rm=T)
+
+  # Check whether it has missing HUCs
+  missing_indx<-which(!basin[[zonal_field]] %in% unique(da_sta$BasinID) )
+  if(length(missing_indx)>0){
+    shp<-basin[missing_indx,]
+    beginCluster()
+    b<-raster::extract(da,shp,df=T,fun=mean,na.rm=T,weight=T)
+    endCluster()
+    b[,1]<-shp[[zonal_field]]
+    colnames(b)<-c("BasinID",as.character(dates))
+    da_sta<-rbind(da_sta,b)
+  }
+  da_sta<-da_sta%>%
       melt(id="BasinID")%>%
       rename(Date=variable)%>%
       mutate(Date=as.Date(Date))
+
+
   names(da_sta)[3]<-varname
   names(da_sta)[1]<-zonal_field
   return(da_sta)
@@ -408,14 +424,28 @@ f_cellinfo<-function(classfname,Basins,byfield="BasinID",demfname=NULL){
     #
     if (!compareCRS(Basins,dem)) Basins<-spTransform(Basins,crs(dem))
     beginCluster()
-    Basins_r<-rasterize(Basins,dem,field="BasinID")
+    Basins_r<-rasterize(Basins,dem,field=byfield)
     endCluster()
 
-    .a<-data.frame("BasinID"=values(Basins_r),"dem"=values(dem))%>%
+    .a<-data.frame("BasinID"=values(Basins_r),"Elev_m"=values(dem))%>%
       filter(!is.na(BasinID))%>%
       group_by(BasinID)%>%
-      summarise(dem=mean(dem,na.rm=T))
-    Basins$Elev_m<-round(.a[,2],2)
+      summarise(Elev_m=mean(Elev_m,na.rm=T))
+
+    # Check whether it has missing HUCs
+    missing_indx<-which(!Basins$BasinID %in% .a$BasinID)
+    if(length(missing_indx)>0){
+      shp<-Basins[missing_indx,]
+      beginCluster()
+      .b<-raster::extract(dem,shp,df=T,fun=mean,na.rm=T,weight=T)
+      endCluster()
+      .b[,1]<-shp[[byfield]]
+      names(.b)<-c("BasinID","Elev_m")
+      .a<-rbind(.a,.b)
+    }
+    names(.a)[1]<-byfield
+    Basins<-merge(Basins,.a,by=byfield)
+    Basins$Elev_m<-round(Basins$Elev_m,2)
   }
 
   cellinfo<-Basins@data%>%
@@ -451,6 +481,8 @@ hru_lc_imp<-function(impname,classname,shp,byfield=NULL){
     group_by(BasinID,Class)%>%
     summarise(imp=mean(imp,na.rm=T))%>%
     dcast(BasinID~Class)
+
+
   names(lc_imp)<-c(byfield,paste0("Lc_",names(lc_imp)[-1]))
   lc_imp[is.na(lc_imp)]<-0
 
