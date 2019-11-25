@@ -662,6 +662,464 @@ hamon <- function(par, tavg, lat, jdate) {
 }
 
 
+#' @title Sacremento Soil Moisture Accounting Model SAC-SMA
+#' @description revised based on sacsmaR package
+#' @param par model parameters (11 soil parameters)
+#' @param ini.states initial parameters
+#' @param prcp daily precipitation data
+#' @param pet potential evapotranspiration, in mm
+#' @return OUTPUT_DESCRIPTION
+#' @details DETAILS
+#' @examples
+#' \dontrun{
+#' sacSma_mon(pet, prcp,par)
+#' }
+#' @rdname sacSim_mon
+#' @export
+sacSma_mon <- function(pet, prcp,par,ini.states = c(0,0,500,500,500,0)) {
+  if(sum(names(par) %in% c("UZTWM","UZFWM","UZK", "ZPERC",  "REXP", "LZTWM", "LZFSM", "LZFPM",  "LZSK",  "LZPK", "PFREE"))==11){
+    uztwm  <-  par["UZTWM"]    # Upper zone tension water capacity [mm]
+    uzfwm  <-  par["UZFWM"]    # Upper zone free water capacity [mm]
+    lztwm  <-  par["LZTWM"]    # Lower zone tension water capacity [mm]
+    lzfpm  <-  par["LZFPM"]    # Lower zone primary free water capacity [mm]
+    lzfsm  <-  par["LZFSM"]    # Lower zone supplementary free water capacity [mm]
+    uzk    <-  par["UZK"]    # Upper zone free water lateral depletion rate [1/day]
+    lzpk   <-  par["LZPK"]    # Lower zone primary free water depletion rate [1/day]
+    lzsk   <-  par["LZSK"]    # Lower zone supplementary free water depletion rate [1/day]
+    zperc  <-  par["ZPERC"]    # Percolation demand scale parameter [-]
+    rexp   <-  par["REXP"]   # Percolation demand shape parameter [-]
+    pfree  <-  par["PFREE"]   # Percolating water split parameter (decimal fraction)
+    pctim  <- 0 #   par[12]   # Impervious fraction of the watershed area (decimal fraction)
+    adimp  <- 0 #  par[13]   # Additional impervious areas (decimal fraction)
+    riva   <- 0 #  par[14]   # Riparian vegetation area (decimal fraction)
+    side   <- 0 # par[15]   # The ratio of deep recharge to channel base flow [-]
+    rserv  <- 0 #par[16]   # Fraction of lower zone free water not transferrable (decimal fraction)
+  }else{
+    print("Input soil parameter is missing")
+  }
+
+  # Initial Storage States (SAC-SMA)
+  uztwc <- uztwm # Upper zone tension water storage
+  uzfwc <- 1.0 # Upper zone free water storage
+  lztwc <- lztwm # Lower zone tension water storage
+  lzfsc <- lzfsm*0.75 # Lower zone supplementary free water storage
+  lzfpc <- lzfpm*0.75 # Upper zone primary free water storage
+  adimc <- 0 # Additional impervious area storage
+
+  # CONVERT FLOW RATES IN UNITS OF 1/D TO MONTHLY RATES
+
+  # uzk=uzk*30
+  # lzpk=lzpk*30
+  # lzsk=lzsk*30
+
+  # RESERVOIR STATE ARRAY INITIALIZATION
+  simaet  <- vector(mode = "numeric", length = length(prcp))
+  simflow   <- vector(mode = "numeric", length = length(prcp))
+  base_tot  <- vector(mode = "numeric", length = length(prcp))
+  surf_tot  <- vector(mode = "numeric", length = length(prcp))
+  uztwc_ts   <- vector(mode = "numeric", length = length(prcp))
+  uzfwc_ts  <- vector(mode = "numeric", length = length(prcp))
+  lztwc_ts  <- vector(mode = "numeric", length = length(prcp))
+  lzfpc_ts  <- vector(mode = "numeric", length = length(prcp))
+  lzfsc_ts  <- vector(mode = "numeric", length = length(prcp))
+
+  thres_zero  <- 0.00001 # Threshold to be considered as zero
+  parea       <- 1 - adimp - pctim
+
+  for (i in 1:length(prcp)) {
+
+    ### Set input precipitation and potential evapotranspiration
+    pr = prcp[i] # This could be effective rainfall, a sum of rainfall and snowmelt
+    edmnd = pet[i]
+
+    ## Compute for different compnents...
+    # ET(1), ET from Upper zone tension water storage
+    et1 <- edmnd * uztwc/uztwm
+    red <- edmnd - et1  # residual ET demand
+    uztwc <- uztwc - et1
+
+    # ET(2), ET from upper zone free water storage
+    et2 <- 0
+    #print(paste0("I=",i," uztwm= ",uztwm," uztwc= ",uztwc," et1= ", et1, " pr= ",pr," pet= ",edmnd))
+    # in case et1 > uztws, no water in the upper tension water storage
+    if (uztwc <= 0) {
+      et1 <- et1 + uztwc #et1 = uztwc
+      uztwc <- 0
+      red <- edmnd - et1
+
+      # when upper zone free water content is less than residual ET
+      if (uzfwc < red) {
+
+        # all content at upper zone free water zone will be gone as ET
+        et2 <- uzfwc
+        uzfwc <- 0
+        red <- red - et2
+        if (uztwc < thres_zero) uztwc <- 0
+        if (uzfwc < thres_zero) uzfwc <- 0
+
+        # when upper zone free water content is more than residual ET
+      } else {
+        et2 <- red  # all residual ET will be gone as ET
+        uzfwc <- uzfwc - et2
+        red <- 0
+      }
+
+      # in case et1 <= uztws, all maximum et (et1) are consumed at uztwc,
+      # so no et from uzfwc (et2=0)
+    } else {
+
+      # There's possibility that upper zone free water ratio exceeds
+      #upper zone tension water ratio. If so, free water is transferred to
+      #tension water storage
+
+      if((uztwc / uztwm) < (uzfwc / uzfwm)) {
+        uzrat = (uztwc + uzfwc) / (uztwm + uzfwm)
+        uztwc = uztwm * uzrat
+        uzfwc = uzfwm * uzrat
+      }
+
+      if(uztwc < thres_zero) uztwc = 0
+      if(uzfwc < thres_zero) uzfwc = 0
+
+    }
+
+    # ET(3), ET from Lower zone tension water storage when residual ET > 0
+    et3 <- red * lztwc / (uztwm + lztwm) #residual ET is always bigger than ET(3)
+    lztwc <- lztwc - et3
+
+    # if lztwc is less than zero, et3 cannot exceed lztws
+    if(lztwc < 0) {
+      et3   <- et3 + lztwc  # et3 = lztwc
+      lztwc <- 0
+    }
+
+    # Water resupply from Lower free water storages to Lower tension water storage
+    saved  <- rserv * (lzfpm + lzfsm)
+    ratlzt <- lztwc / lztwm
+    ratlz  <- (lztwc + lzfpc + lzfsc - saved) / (lztwm + lzfpm + lzfsm - saved)
+
+    # water is first taken from supplementary water storage for resupply
+    if (ratlzt < ratlz) {
+
+      del <- (ratlz - ratlzt) * lztwm
+      lztwc <- lztwc + del  # Transfer water from lzfss to lztws
+      lzfsc <- lzfsc - del
+
+      # if tranfer exceeds lzfsc then remainder comes from lzfps
+      if(lzfsc < 0) {
+        lzfpc <- lzfpc + lzfsc
+        lzfsc <- 0
+      }
+    }
+
+    if(lztwc < thres_zero) {lztwc <- 0}
+    # Comment for additional imprevious ET
+    # # ET(5), ET from additional impervious (ADIMP) area
+    # # ????? no idea where this come from, I think there's a possibility that et5 can be negative values
+    et5   <- et1 + (red + et2) * (adimc - et1 - uztwc) / (uztwm + lztwm)
+    adimc <- adimc - et5
+    if(adimc < 0) {
+      #et5 cannot exceed adimc
+      et5 <- et5 + adimc # et5 = adimc
+      adimc <- 0
+    }
+    et5 <- et5 * adimp
+
+    # Time interval available moisture in excess of uztw requirements
+    twx <- pr + uztwc - uztwm
+
+    # all moisture held in uztw- no excess
+    if(twx < 0) {
+      uztwc <- uztwc + pr
+      twx <- 0
+      # moisture available in excess of uztw storage
+    } else {
+      uztwc = uztwm
+    }
+    #
+    # for now twx is excess rainfall after filling the uztwc
+    #
+    adimc <- adimc + pr - twx
+
+    # Compute Impervious Area Runoff
+    roimp <- pr * pctim
+
+    # Initialize time interval sums
+    sbf   <- 0  # Sum of total baseflow(from primary and supplemental storages)
+    ssur  <- 0  # Sum of surface runoff
+    sif   <- 0  # Sum of interflow
+    sperc <- 0  # Time interval summation of percolation
+    sdro  <- 0  # Sum of direct runoff from the additional impervious area
+
+    # Determine computational time increments for the basic time interval
+    ninc <- floor(1.0 + 0.2*(uzfwc+twx))  # Number of time increments that interval is divided into for further soil-moisture accountng
+
+    dinc <- 1.0 / ninc                    # Length of each increment in days
+    pinc <- twx / ninc                    # Amount of available moisture for each increment
+
+    # Compute free water depletion fractions for the time increment
+    #(basic depletions are for one day)
+    duz   <- 1 - (1 - uzk)^dinc
+    dlzp  <- 1 - (1 - lzpk)^dinc
+    dlzs  <- 1 - (1 - lzsk)^dinc
+    # This is the version of Peter's
+    # duz   <- uzk*dinc
+    # dlzp  <- lzpk*dinc
+    # dlzs  <- lzsk*dinc
+
+    #print(paste0("ninc=", str(ninc)))
+
+    # Start incremental for-loop for the time interval
+    for (n in 1:ninc){
+
+      adsur <- 0 # Amount of surface runoff. This will be updated.
+      excess<- 0  # the excess of LZ soil water capacity
+
+      # Compute direct runoff from adimp area
+      ratio <- (adimc - uztwc) / lztwm
+      if(ratio < 0) ratio <- 0
+
+      # Amount of direct runoff from the additional impervious area
+      addro <- pinc*(ratio^2)
+
+      # Compute baseflow and keep track of time interval sum
+      # Baseflow from free water primary storage
+      bf_p <- lzfpc * dlzp
+      lzfpc <- lzfpc - bf_p
+      if(lzfpc <= 0.0001) {
+        bf_p  <- bf_p + lzfpc
+        lzfpc <- 0
+      }
+
+      sbf <- sbf + bf_p
+      spbf<- sbf + bf_p
+      # Baseflow from free water supplemental storage
+      bf_s  <- lzfsc * dlzs
+      lzfsc <- lzfsc - bf_s
+      if (lzfsc <= 0.0001) {
+        bf_s <- bf_s + lzfsc
+        lzfsc <- 0
+      }
+
+      # Total Baseflow from primary and supplemental storages
+      sbf <- sbf + bf_s
+
+      # Compute PERCOLATION- if no water available then skip.
+      if((pinc + uzfwc) <= 0.01) {
+        uzfwc <- uzfwc + pinc
+      } else {
+
+        # Limiting drainage rate from the combined saturated lower zone storages
+        percm <- lzfpm * dlzp + lzfsm * dlzs
+        perc <- percm * uzfwc / uzfwm
+
+        # DEFR is the lower zone moisture deficiency ratio
+        defr <- 1.0 - (lztwc + lzfpc + lzfsc)/(lztwm + lzfpm + lzfsm)
+
+        if(defr < 0) {defr <- 0}
+
+        perc <- perc * (1.0 + zperc * (defr^rexp))
+
+        # Note. . . percolation occurs from uzfws before pav is added
+
+        # Percolation rate exceeds uzfws
+        if(perc >= uzfwc) {perc <- uzfwc}
+
+        uzfwc <- uzfwc - perc    # Percolation rate is less than uzfws.
+
+        # Check to see if percolation exceeds lower zone deficiency.
+        check <- lztwc + lzfpc + lzfsc + perc - lztwm - lzfpm - lzfsm
+        if(check > 0) {
+          perc <- perc - check
+          uzfwc <- uzfwc + check
+        }
+
+        # SPERC is the time interval summation of PERC
+        sperc <- sperc + perc
+
+        # Compute interflow and keep track of time interval sum. Note that PINC has not yet been added.
+        del <- uzfwc * duz # The amount of interflow
+
+        ## Check whether interflow is larger than uzfwc
+        if (del > uzfwc) {
+          del<-uzfwc
+          uzfwc<-0.0
+        }else{
+          uzfwc <- uzfwc - del
+        }
+
+        sif <- sif + del
+
+        # Distribute percolated water into the lower zones. Tension water
+        # must be filled first except for the PFREE area. PERCT is
+        # percolation to tension water and PERCF is percolation going to
+        # free water.
+
+        perct <- perc * (1.0 - pfree)  # Percolation going to the tension water storage
+        if((perct + lztwc) <= lztwm) {
+
+          lztwc <- lztwc + perct
+          percf <- 0 # Pecolation going to th lower zone free water storages
+
+        } else {
+
+          percf <- lztwc + perct - lztwm
+          lztwc <- lztwm
+
+        }
+
+        # Distribute percolation in excess of tension requirements among the free water storages.
+        percf <- percf + (perc * pfree)
+
+        if(percf != 0) {
+
+          # Relative size of the primary storage as compared with total lower zone free water storages.
+          hpl <- lzfpm / (lzfpm + lzfsm)
+
+          # Relative fullness of each storage.
+          ratlp <- lzfpc / lzfpm
+          ratls <- lzfsc / lzfsm
+
+          # The fraction going to primary
+          fracp <- hpl * 2 * (1 - ratlp) / (2 - ratlp - ratls)
+
+          if(fracp > 1.0) {fracp <- 1.0}
+
+          percp <- percf * fracp # Amount of the excess percolation going to primary
+          percs <- percf - percp # Amount of the excess percolation going to supplemental
+          lzfsc <- lzfsc + percs
+
+
+          if(lzfsc > lzfsm) {
+            percs <- percs - lzfsc + lzfsm
+            lzfsc <- lzfsm
+          }
+
+          lzfpc <- lzfpc + percf - percs
+
+          # This is different to Peter's
+          #
+          # Check to make sure lzfps does not exceed lzfpm
+          if(lzfpc >= lzfpm) {
+            excess <- lzfpc - lzfpm
+            lztwc <- lztwc + excess
+            lzfpc <- lzfpm
+            if(lztwc >= lztwm) {
+              excess <- lztwc - lztwm
+              lztwc <- lztwm
+            }
+          }
+
+        }
+
+        #
+
+        # Distribute PINC between uzfws and surface runoff
+        if((pinc+excess) != 0) {
+
+          # check if pinc exceeds uzfwm
+          if((pinc + uzfwc+excess) <= uzfwm) {
+
+            uzfwc <- uzfwc + pinc+excess  # no surface runoff
+          } else {
+            sur <- pinc + uzfwc + excess - uzfwm # Surface runoff
+            uzfwc <- uzfwm
+
+            ssur = ssur + (sur * parea)
+
+            # ADSUR is the amount of surface runoff which comes from
+            # that portion of adimp which is not currently generating
+            # direct runoff. ADDRO/PINC is the fraction of adimp
+            # currently generating direct runoff.
+            adsur = sur * (1.0 - addro / pinc)
+            ssur = ssur + adsur * adimp
+
+          }
+        }
+      }
+
+      adimc <- adimc + pinc - addro - adsur
+      if(adimc > (uztwm + lztwm)) {
+        addro = addro + adimc - (uztwm + lztwm)
+        adimc = uztwm + lztwm
+      }
+
+      # Direct runoff from the additional impervious area
+      sdro  = sdro + (addro * adimp)
+
+      if(adimc < thres_zero) {adimc <- 0}
+
+    } # END of incremental for loop
+
+    # Compute sums and adjust runoff amounts by the area over which they are generated.
+
+    # EUSED is the ET from PAREA which is 1.0 - adimp - pctim
+    eused <- et1 + et2 + et3
+    sif <- sif * parea
+
+    # Separate channel component of baseflow from the non-channel component
+    tbf <- sbf * parea   # TBF is the total baseflow
+    bfcc <- tbf / (1 + side)    # BFCC is baseflow, channel component
+
+    bfp = (spbf * parea) / (1.0 + side)
+    bfs = bfcc - bfp
+    if (bfs < 0.) bfs = 0
+    bfncc = tbf - bfcc # BFNCC IS BASEFLOW, NON-CHANNEL COMPONENT
+
+    # Ground flow and Surface flow
+    base <- bfcc                       # Baseflow and Interflow are considered as Ground inflow to the channel
+    surf <- roimp + sdro + ssur + sif  # Surface flow consists of Direct runoff and Surface inflow to the channel
+
+    # ET(4)- ET from riparian vegetation.
+    et4 <- (edmnd - eused) * riva  # no effect if riva is set to zero
+
+    # Compute total evapotransporation - TET
+    eused <- eused * parea
+    tet <- eused + et4 + et5
+
+    # Check that adimc >= uztws
+    # This is not sure?
+    #if(adimc > uztwc) adimc <- uztwc
+
+    # Total inflow to channel for a timestep
+    tot_outflow <- surf + base - et4;
+
+    ### ------- Adjustments to prevent negative flows -------------------------#
+
+    # If total outflow <0 surface and baseflow needs to be updated
+    if (tot_outflow < 0) {
+
+      tot_outflow = 0; surf = 0; base = 0;
+
+    } else {
+
+      surf_remainder = surf - et4
+      surf <- max(0,surf_remainder)
+
+      if (surf_remainder < 0) { # In this case, base is reduced
+
+        base = base + surf_remainder
+        if (base < 0) base = 0
+      }
+    }
+
+    # Total inflow to channel for a timestep
+    simaet[i]  <- tet
+    simflow[i]  <- tot_outflow
+    surf_tot[i] <- surf
+    base_tot[i] <- base
+    uztwc_ts[i] <- uztwc
+    uzfwc_ts[i]  <- uzfwc
+    lztwc_ts[i]  <- lztwc
+    lzfpc_ts[i]  <- lzfpc
+    lzfsc_ts[i]  <- lzfsc
+  } #close time-loop
+  return(data.frame("aetTot" = simaet,"flwTot" = simflow, "flwSurface" = surf_tot, "flwBase" = base_tot,
+                    "uztwc"=uztwc_ts,"uzfwc"=uzfwc_ts,
+                    "lztwc"=lztwc_ts,"lzfpc"=lzfpc_ts,"lzfsc"=lzfsc_ts))
+}
+
+
 # SNOW Model based on Tavg----
 #' @title SNOW Model
 #' @description Peter's Snow model
@@ -778,90 +1236,90 @@ dWaSSIC<- function(sim.dates, warmup=3,mcores=1,
 
   if (!is.null(huc.lc.ratio)) NLCs<-length(huc.lc.ratio[1,])
   # WaSSI for each HRU and calculate adjust temp and pet values
-  WaSSI<-function(h){
-
-    # Using snowmelt function to calculate effective rainfall
-
-    snow.result<-snow_melt(ts.prcp = hru_prcp[,h],ts.temp = hru_tavg[,h],snowrange = c(-5,1))
-    hru_rain <- snow.result$prcp
-
-    # PET using Hamon equation
-    hru_pet <- hamon(par = par.petHamon[h], tavg = hru_tavg[,h], lat = hru_lat[h], jdate = jdate)
-    hru_pet<-hru_pet*days_mon
-    # Calculate hru flow for each elevation band
-    ## calculate flow for each land cover type
-
-    # if lai data is not enough
-    if(is.null(sim.dates[["Start_lai"]])) str.date.lai<-sim.dates[["Start_climate"]]
-    if(is.null(sim.dates[["End_lai"]])) end.date.lai<-sim.dates[["End_climate"]]
-
-    ## set the first year lai to before
-    if(sim.dates[["Start_lai"]]>sim.dates[["Start"]]-years(warmup)){
-      lack_lai_years<-floor(as.numeric(difftime(sim.dates[["Start_lai"]],sim.dates[["Start"]]-years(warmup),units="days")/365))
-      hru.lc.lai<-lapply(hru.lc.lai,function(x) rbind(apply(x[1:12,],2,rep,lack_lai_years),x))
-      sim.dates[["Start_lai"]]<-sim.dates[["Start"]]-years(warmup)
-    }
-    ## set the last year lai to after
-    if(sim.dates[["End_lai"]]<sim.dates[["End"]]){
-      lack_lai_years<-floor(as.numeric(difftime(sim.dates[["End"]],sim.dates[["End_lai"]],units="days")/365))
-      start1<-length(hru.lc.lai[[1]][,1])-11
-      hru.lc.lai<-lapply(hru.lc.lai,function(x) rbind(x,apply(x[start1:(start1+11),],2,rep,lack_lai_years)))
-      sim.dates[["End_lai"]]<-sim.dates[["End"]]
-    }
-
-    # filter lai data by the simulation date
-    lai_date <- seq.Date(sim.dates[["Start_lai"]], sim.dates[["End_lai"]], by = "month")
-    grid_ind_lai <-which(lai_date %in% sim_date)
-    hru.lc.lai<-lapply(hru.lc.lai,function(x) x[grid_ind_lai,] )
-
-    # Calculate PET based on LAI
-    if(is.null(ET.coefs)){
-      hru_lc_pet<-hru_pet*hru.lc.lai[[h]]*0.0222+0.174*hru_mrain+0.502*hru_pet+5.31*hru.lc.lai[[h]]
-    }else{
-      # Calculate the actual ET based on SUN's ET model
-      hru_lc_pet<-matrix(NA,nrow =length(hru_pet), ncol=NLCs)
-      for (i in c(1:NLCs)){
-        hru_lc_pet[,i]<- ET.coefs[i,"Intercept"] +
-          ET.coefs[i,"P_coef"]*hru_mrain+
-          ET.coefs[i,"PET_coef"]*hru_pet+
-          ET.coefs[i,"LAI_coef"]*hru.lc.lai[[h]][i]+
-          ET.coefs[i,"P_PET_coef"]*hru_mrain*hru_pet +
-          ET.coefs[i,"P_LAI_coef"]*hru_mrain*hru.lc.lai[[h]][i] +
-          ET.coefs[i,"PET_LAI_coef"] *hru_pet*hru.lc.lai[[h]][i]
-      }
-    }
-
-    # combin all the input
-    hru_in<-list(prcp=hru_prcp[,h],
-                    temp = hru_tavg[,h],
-                    rain=hru_rain,
-                    snowpack=snow.result$snowpack,
-                    snowmelt=snow.result$snowmelt,
-                    PET_hamon=hru_pet)
-
-    # calculate flow based on PET and SAC-SMA model
-    hru_lc_out <-apply(hru_lc_pet,2,sacSma_mon,par = par.sacsma[h,], prcp = hru_mrain )
-
-    if(!is.null(WUE.coefs)){
-      # Calculate Carbon based on WUE for each vegetation type
-      for (i in c(1:NLCs)){
-        hru_lc_out[[i]][["GEP"]]<-hru_lc_out[[i]][["totaet"]] *WUE.coefs$WUE[i]
-        hru_lc_out[[i]][["RECO"]]<-WUE.coefs$RECO_Intercept[i] + hru_lc_out[[i]][["GEP"]] *WUE.coefs$RECO_Slope[i]
-        hru_lc_out[[i]][["NEE"]] <-hru_lc_out[[i]][["RECO"]]-hru_lc_out[[i]][["GEP"]]
-      }
-    }
-    for (i in c(1:NLCs)){
-      hru_lc_out[[i]][["LAI"]]<-hru.lc.lai[[h]][i]
-      hru_lc_out[[i]][["PET"]]<-hru_lc_pet[,i]
-    }
-
-    # Weight each land cover type based on it's ratio
-    hru_out<-lapply(c(1:length(huc.lc.ratio[h,])),function(x) lapply(hru_lc_out[[x]],function(y) huc.lc.ratio[h,x]*y))
-    out<-lapply(names(hru_lc_out[[1]]), function(var) apply(sapply(hru_out, function(x) x[[var]]),1,sum))
-    names(out)<-names(hru_lc_out[[1]])
-
-    return(list(input=hru_in,out=out,lc_out=hru_lc_out))
-  }
+  # WaSSI<-function(h){
+  #
+  #   # Using snowmelt function to calculate effective rainfall
+  #
+  #   snow.result<-snow_melt(ts.prcp = hru_prcp[,h],ts.temp = hru_tavg[,h],snowrange = c(-5,1))
+  #   hru_rain <- snow.result$prcp
+  #
+  #   # PET using Hamon equation
+  #   hru_pet <- hamon(par = par.petHamon[h], tavg = hru_tavg[,h], lat = hru_lat[h], jdate = jdate)
+  #   hru_pet<-hru_pet*days_mon
+  #   # Calculate hru flow for each elevation band
+  #   ## calculate flow for each land cover type
+  #
+  #   # if lai data is not enough
+  #   if(is.null(sim.dates[["Start_lai"]])) str.date.lai<-sim.dates[["Start_climate"]]
+  #   if(is.null(sim.dates[["End_lai"]])) end.date.lai<-sim.dates[["End_climate"]]
+  #
+  #   ## set the first year lai to before
+  #   if(sim.dates[["Start_lai"]]>sim.dates[["Start"]]-years(warmup)){
+  #     lack_lai_years<-floor(as.numeric(difftime(sim.dates[["Start_lai"]],sim.dates[["Start"]]-years(warmup),units="days")/365))
+  #     hru.lc.lai<-lapply(hru.lc.lai,function(x) rbind(apply(x[1:12,],2,rep,lack_lai_years),x))
+  #     sim.dates[["Start_lai"]]<-sim.dates[["Start"]]-years(warmup)
+  #   }
+  #   ## set the last year lai to after
+  #   if(sim.dates[["End_lai"]]<sim.dates[["End"]]){
+  #     lack_lai_years<-floor(as.numeric(difftime(sim.dates[["End"]],sim.dates[["End_lai"]],units="days")/365))
+  #     start1<-length(hru.lc.lai[[1]][,1])-11
+  #     hru.lc.lai<-lapply(hru.lc.lai,function(x) rbind(x,apply(x[start1:(start1+11),],2,rep,lack_lai_years)))
+  #     sim.dates[["End_lai"]]<-sim.dates[["End"]]
+  #   }
+  #
+  #   # filter lai data by the simulation date
+  #   lai_date <- seq.Date(sim.dates[["Start_lai"]], sim.dates[["End_lai"]], by = "month")
+  #   grid_ind_lai <-which(lai_date %in% sim_date)
+  #   hru.lc.lai<-lapply(hru.lc.lai,function(x) x[grid_ind_lai,] )
+  #
+  #   # Calculate PET based on LAI
+  #   if(is.null(ET.coefs)){
+  #     hru_lc_pet<-hru_pet*hru.lc.lai[[h]]*0.0222+0.174*hru_mrain+0.502*hru_pet+5.31*hru.lc.lai[[h]]
+  #   }else{
+  #     # Calculate the actual ET based on SUN's ET model
+  #     hru_lc_pet<-matrix(NA,nrow =length(hru_pet), ncol=NLCs)
+  #     for (i in c(1:NLCs)){
+  #       hru_lc_pet[,i]<- ET.coefs[i,"Intercept"] +
+  #         ET.coefs[i,"P_coef"]*hru_mrain+
+  #         ET.coefs[i,"PET_coef"]*hru_pet+
+  #         ET.coefs[i,"LAI_coef"]*hru.lc.lai[[h]][i]+
+  #         ET.coefs[i,"P_PET_coef"]*hru_mrain*hru_pet +
+  #         ET.coefs[i,"P_LAI_coef"]*hru_mrain*hru.lc.lai[[h]][i] +
+  #         ET.coefs[i,"PET_LAI_coef"] *hru_pet*hru.lc.lai[[h]][i]
+  #     }
+  #   }
+  #
+  #   # combin all the input
+  #   hru_in<-list(prcp=hru_prcp[,h],
+  #                   temp = hru_tavg[,h],
+  #                   rain=hru_rain,
+  #                   snowpack=snow.result$snowpack,
+  #                   snowmelt=snow.result$snowmelt,
+  #                   PET_hamon=hru_pet)
+  #
+  #   # calculate flow based on PET and SAC-SMA model
+  #   hru_lc_out <-apply(hru_lc_pet,2,sacSma_mon,par = par.sacsma[h,], prcp = hru_mrain )
+  #
+  #   if(!is.null(WUE.coefs)){
+  #     # Calculate Carbon based on WUE for each vegetation type
+  #     for (i in c(1:NLCs)){
+  #       hru_lc_out[[i]][["GEP"]]<-hru_lc_out[[i]][["totaet"]] *WUE.coefs$WUE[i]
+  #       hru_lc_out[[i]][["RECO"]]<-WUE.coefs$RECO_Intercept[i] + hru_lc_out[[i]][["GEP"]] *WUE.coefs$RECO_Slope[i]
+  #       hru_lc_out[[i]][["NEE"]] <-hru_lc_out[[i]][["RECO"]]-hru_lc_out[[i]][["GEP"]]
+  #     }
+  #   }
+  #   for (i in c(1:NLCs)){
+  #     hru_lc_out[[i]][["LAI"]]<-hru.lc.lai[[h]][i]
+  #     hru_lc_out[[i]][["PET"]]<-hru_lc_pet[,i]
+  #   }
+  #
+  #   # Weight each land cover type based on it's ratio
+  #   hru_out<-lapply(c(1:length(huc.lc.ratio[h,])),function(x) lapply(hru_lc_out[[x]],function(y) huc.lc.ratio[h,x]*y))
+  #   out<-lapply(names(hru_lc_out[[1]]), function(var) apply(sapply(hru_out, function(x) x[[var]]),1,sum))
+  #   names(out)<-names(hru_lc_out[[1]])
+  #
+  #   return(list(input=hru_in,out=out,lc_out=hru_lc_out))
+  # }
 
   huc_routing<-function(h){
     out2<-lohamann(par = par.routing[h,], inflow.direct = out[[h]][["surf"]],
@@ -895,6 +1353,99 @@ dWaSSIC<- function(sim.dates, warmup=3,mcores=1,
   return(list(FLOW_SURF = out3[[1]], FLOW_BASE=out3[[2]],HUC=out))
 
 }
+
+
+# WaSSI for each HRU and calculate adjust temp and pet values
+WaSSI<-function(hru,datain,sim.dates){
+  require(dplyr)
+  library(tidyr)
+
+  # Set the input variables
+  hru_prcp<-subset(datain$Climate,BasinID==hru)$Ppt_mm[sim.dates$climate_index]
+  hru_tavg<-subset(datain$Climate,BasinID==hru)$Tavg_C[sim.dates$climate_index]
+  NoLcs<-length(names(datain[["LAI"]]))-3
+  hru_lat<-subset(datain$Cellinfo,BasinID==hru)$Latitude
+  jdate<-sim.dates$jdate
+  days_mon<-sim.dates$dateDays
+  hru.lc.lai<-subset(datain$LAI,BasinID==hru)[sim.dates$lai_index,-c(1:3)]
+  par.sacsma<-unlist(subset(datain$Soilinfo,BasinID==hru)[-c(1)])
+  names(par.sacsma)<-toupper(names(par.sacsma))
+  huc.lc.ratio<-unlist(subset(datain$Cellinfo,BasinID==hru)[grep("Lc",names(datain$Cellinfo))])
+
+  ET.coefs<-datain$ET_coefs
+  WUE.coefs<-datain$WUE_coefs
+
+  # Using snowmelt function to calculate effective rainfall and snowmelt
+  snow.result<-snow_melt(ts.prcp = hru_prcp,ts.temp = hru_tavg,snowrange = c(-5,1))
+  hru_rain <- snow.result$prcp
+
+  # PET using Hamon equation
+  hru_pet <- hamon(par = 1, tavg = hru_tavg, lat = hru_lat, jdate = jdate)
+  hru_pet<-hru_pet*days_mon
+
+  # Calculate hru flow for each elevation band
+  # Calculate PET_Sun based on LAI
+  if(is.null(ET.coefs)){
+    hru_lc_pet<-hru_pet*hru.lc.lai*0.0222+0.174*hru_rain+0.502*hru_pet+5.31*hru.lc.lai
+  }else{
+    # Calculate the PET_Sun based on user defined model
+    hru_lc_pet<-matrix(NA,nrow =length(hru_pet), ncol=NoLcs)
+    for (i in c(1:NoLcs)){
+      hru_lc_pet[,i]<- ET.coefs[i,"Intercept"] +
+        ET.coefs[i,"P_coef"]*hru_rain+
+        ET.coefs[i,"PET_coef"]*hru_pet+
+        ET.coefs[i,"LAI_coef"]*hru.lc.lai[[i]]+
+        ET.coefs[i,"P_PET_coef"]*hru_rain*hru_pet +
+        ET.coefs[i,"P_LAI_coef"]*hru_rain*hru.lc.lai[[i]] +
+        ET.coefs[i,"PET_LAI_coef"] *hru_pet*hru.lc.lai[[i]]
+    }
+  }
+
+  # Set the min PET of Hamon or Sun PET as the PET
+  #hru_lc_pet<- apply(hru_lc_pet,2,function(x) apply(cbind(x,hru_pet),1,min))
+
+  # calculate flow based on PET and SAC-SMA model
+  hru_lc_out <-apply(hru_lc_pet,2,sacSma_mon,par = par.sacsma, prcp = hru_rain)
+
+  # Calculate Carbon based on WUE for each vegetation type
+  if(!is.null(WUE.coefs)){
+    for (i in c(1:NoLcs)){
+      hru_lc_out[["GEP"]][[i]]<-hru_lc_out[["totaet"]][[i]] *WUE.coefs$WUE[i]
+      hru_lc_out[["RECO"]][[i]]<-WUE.coefs$RECO_Intercept[i] + hru_lc_out[[i]][["GEP"]] *WUE.coefs$RECO_Slope[i]
+      hru_lc_out[["NEE"]][[i]] <-hru_lc_out[["RECO"]][[i]]-hru_lc_out[["GEP"]][[i]]
+    }
+  }
+  # Add LAI and PET to each land cover and subset the target period
+  for (i in c(1:NoLcs)){
+    hru_lc_out[[i]][["LAI"]]<-hru.lc.lai[[i]]
+    hru_lc_out[[i]][["PET"]]<-hru_lc_pet[,i]
+    hru_lc_out[[i]][["Date"]]<-sim.dates$Seq_date
+    hru_lc_out[[i]]<-hru_lc_out[[i]]%>%filter(Date>=sim.dates$Start) %>% dplyr::select(-Date)
+  }
+
+  # combin all the input
+  hru_in<-data.frame(Date=sim.dates$Seq_date,
+                     prcp=hru_prcp,
+                     temp = hru_tavg,
+                     rain=hru_rain,
+                     snowpack=snow.result$snowpack,
+                     snowmelt=snow.result$snowmelt,
+                     PET_hamon=hru_pet)%>%
+    filter(Date>=sim.dates$Start)%>%
+    dplyr::select(-Date)
+
+  # process data for each lc
+  vars<-names(hru_lc_out[[1]])
+  #vars<-vars[1:(length(vars)-1)]
+  hru_lc_out<-lapply(vars, function(x) sapply(hru_lc_out, "[[", x))
+  names(hru_lc_out)<-vars
+  hru_out<-sapply(hru_lc_out, function(x) apply(x, 1, weighted.mean,huc.lc.ratio) )
+  #colnames(hru_out)<-vars
+  #hru_lc_out$Date<-hru_in$Date
+  hru_in<-cbind(hru_in,hru_out)
+  return(list(output=hru_in,lc_output=hru_lc_out))
+}
+
 
 
 librs<-c("dplyr","zip","lubridate","raster","ggplot2","leaflet","rgdal","rgeos","leaflet.extras","parallel","shinyFiles","tidyr","reshape2")
