@@ -239,8 +239,9 @@ shinyUI(
                       "),
                  fileInput('Input_basin1', 'Choose watershed shapefile', multiple=FALSE, accept="gml"),
                  # Input: Result plot variables ----
-                 checkboxGroupInput("mapvars","Select the layers to plot",c("P","T","ET","Q"),selected="Q",inline = T),
-
+                 #checkboxGroupInput("mapvars","Select the layers to plot",c("P","T","ET","Q"),selected="Q",inline = T),
+                 selectInput("mapvars", "Select the layers to plot.",
+                             choices=c("P","T","ET","Q","LAI")),
                  #checkboxInput("plotannualoutput1", "Annual", FALSE),
                  actionButton("plotresultmap","Plot"),
                  verbatimTextOutput("printplotresultinfo")
@@ -253,10 +254,11 @@ shinyUI(
                  # leafletOutput("basinmap"),
 
 
-                 h2("Plot an interactice map for the simulated result."),
+                 h2("Maping the simulated result."),
                  HTML("<p>It will take a while for the data process. Please wait ...</p>
                       "),
-                 leafletOutput("resultmap")
+                 # leafletOutput("outresultmap")
+                 plotOutput("outresultmap", width = "100%")
                )
              )
     ),

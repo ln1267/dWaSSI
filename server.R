@@ -1170,94 +1170,145 @@ shinyServer(function(input, output,session) {
   output$printplotresultinfo<-renderPrint({
     if(!is.null(inforprint$plottingresult)) writeLines(inforprint$plottingresult)
   })
-  vars_sel<-c("P"="prcp","Q"="flwTot","ET"="aetTot")
+
   ## PlotAction: Plot result maps  ----
   observeEvent(input$plotresultmap,{
 
-    withProgress(message = 'In process ...', value = 0,{
-      incProgress(0.3, detail = paste("ploting ..."))
+    # withProgress(message = 'In process ...', value = 0,{
+      # incProgress(0.3, detail = paste("ploting ..."))
     if(is.null(BasinShp)) {
       f_addinfo("plottingresult","Shapfile is needed for plotting.")
       return()
     }
-      output$resultmap <- renderLeaflet({
+
+      ## merge data to the shapefile
+      Basinout<-merge(BasinShp,resultOutput$Output_Basin_avg[c("BasinID","flwTot","LAI","temp","prcp","aetTot")],by="BasinID")
+      Basinout<-st_as_sf(Basinout)
+      #print(str(Basinout))
+
+      vars_sel<-c("P"="prcp","LAI"="LAI","T"="temp","Q"="flwTot","ET"="aetTot")
+      unit_sel<-c("P"="Precipitation \n (mm/yr)","LAI"="Leaf area index","T"="Temperature \n (C)","Q"="Water yield \n (mm/yr)","ET"="Evapotranspiration \n (mm/yr)")
+      output$outresultmap <- renderPlot({
+
         input$plotresultmap
-        # Plot the BasinShp
-        print("plotting basic map")
-        input_leaflet<-leaflet() %>%
-          addTiles(group = "OSM (default)") %>%
-          addProviderTiles('Esri.WorldImagery',group = "Esri.Imagery")%>%
-          addFullscreenControl()
-        grps<-c("OSM (default)", "Esri.Imagery")
-        ovlgrps<-NULL
+        bks1 <- round(getBreaks(v = Basinout[[vars_sel[[input$mapvars]]]], nclass = 5, method = "equal"),0)
 
-        if (!is.null(BasinShp)) {
-          print("Add basin to basic map")
-          popups<-paste0("BasinID = ",BasinShp$BasinID)
-          if("Elev_m" %in% names(BasinShp)) popups<-f_paste(popups,paste0("; Elevatation = ",round(BasinShp$Elev_m,0),"m"))
+        if(input$mapvars %in% c("P","ET","Q")){
 
-          ovlgrps<-c(ovlgrps,"Watershed")
-          input_leaflet<-input_leaflet%>%
-            addPolygons(data=BasinShp,weight=1,col = 'red',fillOpacity = 0.2,
-                        highlight = highlightOptions(color='white',weight=1,
-                                                     bringToFront = TRUE),
-                        group = "Watershed")%>%
-            addMarkers(lng = BasinShp$Longitude, lat = BasinShp$Latitude,
-                       popup = popups,
-                       label = paste0("BasinID = ",BasinShp$BasinID),
-                       clusterOptions = markerClusterOptions())
+          brk_cols<-carto.pal(pal1 = "sand.pal",n1=2,pal2 = "blue.pal", n2 = 3)
 
-        }
-        vars_sel<-c("P"="prcp","T"="Tavg_C","Q"="flwTot","ET"="aetTot")
-        # add P
-        if("T" %in% input$mapvars){
-          print("Adding Tavg to basic map")
-          popups<-paste0("HUC_ID = ",BasinShp$BasinID,"; Tavg = ",round(BasinShp[["Tavg_C"]],2))
-          ovlgrps<-c(ovlgrps,"Temperature")
-          pal_tmp <- colorBin("YlGn", BasinShp[["Tavg_C"]],n=7,pretty = T)
+        }else if (input$mapvars %in% c("T")){
+          brk_cols<-carto.pal(pal1 = "blue.pal",n1=2,pal2 ="sand.pal" , n2 = 3)
 
-          input_leaflet<-input_leaflet%>%
-          addPolygons(data=BasinShp,stroke = FALSE, weight = 0.5, smoothFactor = 0.5,
-                      opacity = 1.0, fillOpacity = 0.5,
-                      color = ~pal_tmp(BasinShp[["Tavg_C"]]))%>%
-          addMarkers(lng = BasinShp$Longitude, lat = BasinShp$Latitude,
-                     popup = popups,
-                     label = paste0("HUC_ID = ",BasinShp$BasinID),
-                     clusterOptions = markerClusterOptions())%>%
-            addLegend("bottomleft",pal = pal_tmp, values = BasinShp[["Tavg_C"]],
-                      title = "Mean temp (°C)", group = "Temperature")
-        print("finished adding T")
-          }
-        # add P
-        if("P" %in% input$mapvars){
-          print("Adding Pre to basic map")
-          popups<-paste0("HUC_ID = ",BasinShp$BasinID,"; Ppt_mm = ",round(BasinShp[["Ppt_mm"]],1))
-          ovlgrps<-c(ovlgrps,"Precipitation")
-          pal_tmp <- colorBin("GnBu", BasinShp[["Ppt_mm"]],n=7,pretty = T)
-
-          input_leaflet<-input_leaflet%>%
-            addPolygons(data=BasinShp,color = "gray", weight = 0.5, smoothFactor = 0.5,
-                        opacity = 1.0, fillOpacity = 0.5,
-                        fill = ~pal_tmp(BasinShp[["Ppt_mm"]]))%>%
-            addMarkers(lng = BasinShp$Longitude, lat = BasinShp$Latitude,
-                       popup = popups,
-                       label = paste0("HUC_ID = ",BasinShp$BasinID),
-                       clusterOptions = markerClusterOptions())%>%
-            addLegend("bottomleft",pal = pal_tmp, values = BasinShp[["Ppt_mm"]],
-                      title = "Precipitation (mm)", group = "Precipitation")
-          print("finished adding P")
+        } else if (input$mapvars %in% c("LAI")){
+          brk_cols<-carto.pal(pal1 = "sand.pal",n1=2,pal2 ="green.pal" , n2 = 3)
         }
 
-        # Layers control
-        input_leaflet %>%
-          addLayersControl(
-            baseGroups = grps,
-            overlayGroups = ovlgrps,
-            options = layersControlOptions(collapsed = FALSE)
-          )
-        print("finished plotting")
-      })
-    })
+        ggplot() +
+            geom_sf(data = Basinout, aes(fill = get(vars_sel[[input$mapvars]])),show.legend = T,lwd=0.04) +
+            scale_fill_gradientn(unit_sel[[input$mapvars]],breaks = bks1,colors = brk_cols)+
+            labs(x="Latitude",y="Longitude")+
+            theme_ning(size.axis = 10,size.title = 12)
+
+
+        # library(mapview)
+        # mapview(Basinout[vars_sel[[input$mapvars]]], col.regions = sf.colors(10))
+
+        # #png("fig.png",res=300,width = 6,units = "in", height = f_dim[2])
+        # par(mar = c(0.1,0.2,0.1,0.1))
+        # choroLayer(x = Basinout, var = vars_sel[[input$mapvars]], breaks = bks1, col = brk_cols,legend.pos = "n",lwd = 0.01)
+        # legendChoro(pos = "bottomleft",
+        #             title.txt = vars_sel[[input$mapvars]],
+        #             breaks = bks1,
+        #             col = brk_cols, nodata = TRUE, nodata.txt = "No Data")
+        # # labelLayer(x = mtq, txt = "BasinID",
+        # #            halo = TRUE, overlap = FALSE)
+        #
+        # layoutLayer(
+        #   title = "", tabtitle = F, frame = TRUE,
+        #   north = TRUE)
+        #dev.off()
+
+
+      # output$outresultmap <- renderLeaflet({
+      #   # input$plotresultmap
+      #   # Plot the BasinShp
+      #  print("plotting basic map")
+      #   # input_leaflet<-leaflet() %>%
+      #   #   addTiles(group = "OSM (default)") %>%
+      #   #   addProviderTiles('Esri.WorldImagery',group = "Esri.Imagery")%>%
+      #   #   addFullscreenControl()
+      #   # grps<-c("OSM (default)", "Esri.Imagery")
+      #   # ovlgrps<-NULL
+      #
+      #     # print("Add basin to basic map")
+      #     # popups<-paste0("BasinID = ",Basinout$BasinID)
+      #     # if("Elev_m" %in% names(BasinShp)) popups<-f_paste(popups,paste0("; Elevatation = ",round(BasinShp$Elev_m,0),"m"))
+      #     #
+      #     # ovlgrps<-c(ovlgrps,"Watershed")
+      #     # input_leaflet<-input_leaflet%>%
+      #     #   addPolygons(data=Basinout,weight=1,col = 'red',fillOpacity = 0.2,
+      #     #               highlight = highlightOptions(color='white',weight=1,
+      #     #                                            bringToFront = TRUE),
+      #     #               group = "Watershed")%>%
+      #     #   addMarkers(lng = Basinout$Longitude, lat = Basinout$Latitude,
+      #     #              popup = popups,
+      #     #              label = paste0("BasinID = ",Basinout$BasinID),
+      #     #              clusterOptions = markerClusterOptions())
+      #     #
+      #     # vars_sel<-c("P"="prcp","LAI"="LAI","T"="temp","Q"="flwTot","ET"="aetTot")
+      #   # add P
+      #   # if("T" %in% input$mapvars){
+      #   #   print("Adding Tavg to basic map")
+      #   #   value_basins<-round(Basinout[[vars_sel[["T"]]]],2)
+      #   #   popups<-paste0("HUC_ID = ",Basinout$BasinID,"; Tavg = ",value_basins)
+      #   #   ovlgrps<-c(ovlgrps,"Temperature")
+      #   #   pal_tmp <- colorBin("YlGn", value_basins,n=7,pretty = T)
+      #   #
+      #   #   input_leaflet<-input_leaflet%>%
+      #   #   addPolygons(data=Basinout,stroke = FALSE, weight = 0.5, smoothFactor = 0.5,
+      #   #               opacity = 1.0, fillOpacity = 0.5,
+      #   #               color = ~pal_tmp(value_basins))%>%
+      #   #   addMarkers(lng = Basinout$Longitude, lat = Basinout$Latitude,
+      #   #              popup = popups,
+      #   #              label = paste0("HUC_ID = ",Basinout$BasinID),
+      #   #              clusterOptions = markerClusterOptions())%>%
+      #   #     addLegend("bottomleft",pal = pal_tmp, values = value_basins,
+      #   #               title = "Mean temp (°C)", group = "Temperature")
+      #   # print("finished adding T")
+      #   #   }
+      #   # # add P
+      #   # if("P" %in% input$mapvars){
+      #   #   print("Adding Pre to basic map")
+      #   #   value_basins<-round(Basinout[[vars_sel[["P"]]]],2)
+      #   #   popups<-paste0("HUC_ID = ",Basinout$BasinID,"; Ppt_mm = ",value_basins)
+      #   #   ovlgrps<-c(ovlgrps,"Precipitation")
+      #   #   pal_tmp <- colorBin("GnBu", value_basins,n=7,pretty = T)
+      #   #
+      #   #   input_leaflet<-input_leaflet%>%
+      #   #     addPolygons(data=Basinout,color = "gray", weight = 0.5, smoothFactor = 0.5,
+      #   #                 opacity = 1.0, fillOpacity = 0.5,
+      #   #                 fill = ~pal_tmp(value_basins))%>%
+      #   #     addMarkers(lng = Basinout$Longitude, lat = Basinout$Latitude,
+      #   #                popup = popups,
+      #   #                label = paste0("HUC_ID = ",Basinout$BasinID),
+      #   #                clusterOptions = markerClusterOptions())%>%
+      #   #     addLegend("bottomleft",pal = pal_tmp, values = value_basins,
+      #   #               title = "Precipitation (mm)", group = "Precipitation")
+      #   #   print("finished adding P")
+      #   # }
+      #
+      #   # Layers control
+      #   # input_leaflet %>%
+      #   #   addLayersControl(
+      #   #     baseGroups = grps,
+      #   #     overlayGroups = ovlgrps,
+      #   #     options = layersControlOptions(collapsed = FALSE)
+      #   #   )
+      #
+      },res = 100)
+      print(paste0("finished plotting - ",input$mapvars))
+    # })
   })
 
 
