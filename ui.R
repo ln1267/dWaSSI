@@ -210,7 +210,7 @@ shinyUI(
                  mainPanel(
 
 
-                   h2("Plot the simulated result."),
+                   h2("Plot the time series of averaged result for the whole area"),
 
                   # Input: Year for plotting ---
                   #sliderInput("plotSimDaterange", "Year plot", 1970, 2017, value = c(2000, 2010)),
@@ -258,7 +258,7 @@ shinyUI(
                  HTML("<p>It will take a while for the data process. Please wait ...</p>
                       "),
                  # leafletOutput("outresultmap")
-                 plotOutput("outresultmap", width = "100%")
+                 plotOutput("outresultmap",width = "auto",height= "600px")
                )
              )
     ),

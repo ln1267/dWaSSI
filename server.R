@@ -1208,7 +1208,8 @@ shinyServer(function(input, output,session) {
             geom_sf(data = Basinout, aes(fill = get(vars_sel[[input$mapvars]])),show.legend = T,lwd=0.04) +
             scale_fill_gradientn(unit_sel[[input$mapvars]],breaks = bks1,colors = brk_cols)+
             labs(x="Latitude",y="Longitude")+
-            theme_ning(size.axis = 10,size.title = 12)
+            coord_sf(datum = sf::st_crs(4326))+
+            theme_ning(size.axis = 8,size.title = 10)
 
 
         # library(mapview)
@@ -1306,7 +1307,7 @@ shinyServer(function(input, output,session) {
       #   #     options = layersControlOptions(collapsed = FALSE)
       #   #   )
       #
-      },res = 100)
+      },res=100)
       print(paste0("finished plotting - ",input$mapvars))
     # })
   })

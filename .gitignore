@@ -17,6 +17,8 @@ OUTPUTS*/*
 www/*
 tmp/*
 data/shps/*
+Result/*
+wrr6/*
 
 # Output files from R CMD build
 /*.tar.gz

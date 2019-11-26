@@ -1481,7 +1481,7 @@ WaSSI<-function(hru,datain,sim.dates){
 
 
 
-librs<-c("dplyr","zip","lubridate","raster","ggplot2","leaflet","rgdal","rgeos","leaflet.extras","parallel","shinyFiles","tidyr","reshape2")
+librs<-c("dplyr","sf","zip","lubridate","raster","ggplot2","leaflet","rgdal","rgeos","cartography","leaflet.extras","parallel","shinyFiles","tidyr","reshape2")
 f_lib_check(librs)
 
 if(!exists("data_input")) data_input<-list()
