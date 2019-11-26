@@ -210,7 +210,7 @@ shinyUI(
                  mainPanel(
 
 
-                   h2("Plot water and carbon processes"),
+                   h2("Plot the simulated result."),
 
                   # Input: Year for plotting ---
                   #sliderInput("plotSimDaterange", "Year plot", 1970, 2017, value = c(2000, 2010)),
@@ -218,7 +218,7 @@ shinyUI(
                   #textInput("plotSimuBasinID", "Type the BasinID for plotting!","0"),
                   # Action: Plot simulated result ---
                   # Input: Result plot variables ----
-                  checkboxGroupInput("plotvars","Select the variables to plot",c("P","AET","Q"),inline = T),
+                  checkboxGroupInput("plotvars","Select the variables to plot",c("P","ET","Q"),selected="Q",inline = T),
 
                   checkboxInput("plotannualoutput", "Annual", FALSE),
                   actionButton("plotsimOut","Plot"),
@@ -228,6 +228,38 @@ shinyUI(
                  )
               )
         ),
+    # Tab: Plot simulated result-----
+    tabPanel("Plot Result",
+             sidebarLayout(
+               sidebarPanel(
+                 # Application title
+
+                 h2("Upload watershed Shapefile"),
+                 HTML("<p>Please chose a '*gml' file to upload.</p>
+                      "),
+                 fileInput('Input_basin1', 'Choose watershed shapefile', multiple=FALSE, accept="gml"),
+                 # Input: Result plot variables ----
+                 checkboxGroupInput("mapvars","Select the layers to plot",c("P","T","ET","Q"),selected="Q",inline = T),
+
+                 #checkboxInput("plotannualoutput1", "Annual", FALSE),
+                 actionButton("plotresultmap","Plot"),
+                 verbatimTextOutput("printplotresultinfo")
+               ),
+
+               # MainPanel for upload data----
+               mainPanel(
+                 ## Output: Head of the selected plotting file----
+                 # h2("The Map of the Watershed"),
+                 # leafletOutput("basinmap"),
+
+
+                 h2("Plot an interactice map for the simulated result."),
+                 HTML("<p>It will take a while for the data process. Please wait ...</p>
+                      "),
+                 leafletOutput("resultmap")
+               )
+             )
+    ),
     # Tab: Help-----
     tabPanel("Help",
              column(5, wellPanel(

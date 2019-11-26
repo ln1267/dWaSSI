@@ -14,7 +14,8 @@ shinyServer(function(input, output,session) {
                             processing="Data process log:",
                             plotting="Plotting log: ",
                             simulating="Simulationg log: ",
-                            simulplotting="Plotting log: ")
+                            simulplotting="Plotting log: ",
+                            plottingresult="Plotting log: ")
   f_addinfo<-function(tab,content=NULL){
     inforprint[[tab]]<<-paste(inforprint[[tab]],content,sep="\n")
   }
@@ -71,36 +72,12 @@ shinyServer(function(input, output,session) {
   })
 
   ## Action: Read Basin shapefile ----
-  if (!exists("BasinShp")) BasinShp<-NULL
+  #if (!exists("BasinShp")) BasinShp<-NULL
   observeEvent(input$Input_basin,{
     inforprint$processing<-"Processing log: "
     f_addinfo("processing","Reading shapfile ...")
-    Basins<- readOGR(input$Input_basin$datapath)
-    if (!"BasinID" %in% names(Basins)) Basins$BasinID<-c(1:length(Basins[,1]))
-    if (is.factor(Basins$BasinID)) Basins$BasinID<-as.integer(as.character(Basins$BasinID))
-    # Add latitude and longitude infor to the Basin
-    if(!"Latitude"  %in% names(Basins)) {
 
-      # get the contral coordinates of each polygon
-     if(is.na(crs(Basins))) proj4string(Basins)<-CRS("+init=epsg:4326")
-      Basins_wgs<-spTransform(Basins,CRS("+init=epsg:4326"))
-      Basin_coords<-gCentroid(Basins_wgs, byid=TRUE)
-      rownames(Basin_coords@coords)<-Basins$BasinID
-      Basin_coords<-as.data.frame(Basin_coords)
-
-      Basins[["Latitude"]]=Basin_coords$y
-      Basins[["Longitude"]]=Basin_coords$x
-
-      # Get the area of each polygon
-     if (!is.projected(Basins)){
-       Basins_pro<-spTransform(Basins,CRS("+init=epsg:32648"))
-       Basins[["Area_m2"]]=round(gArea(Basins_pro,byid = T),2)
-     }else{
-       Basins[["Area_m2"]]=round(gArea(Basins,byid = T),2)
-     }
-
-    }
-    BasinShp<<-Basins
+    BasinShp<<-f_read_basin(input$Input_basin$datapath)
     f_addinfo("processing","Finished processing the uploaded shapefile.")
   })
 
@@ -982,6 +959,7 @@ shinyServer(function(input, output,session) {
   df<-resultOutput[["Station_output"]]%>%
     filter(Date>=plot_dates[1] & Date<=plot_dates[2])
 
+  vars_sel<-c("P"="prcp","Q"="flwTot","ET"="aetTot")
     output$SimOutplot <- renderPlot({
       input$plotsimOut
       #print(head(df))
@@ -992,9 +970,9 @@ shinyServer(function(input, output,session) {
           group_by(Year)%>%
           summarise_all(.funs = sum)%>%
           gather(Variable,Value,prcp:PET)%>%
-          filter(Variable %in% c("flwTot","flwBase","flwSurface","aetTot","prcp"))%>%
+          filter(Variable %in% vars_sel[input$plotvars])%>%
           mutate(Variable=factor(Variable,levels = c("flwTot","flwBase","flwSurface","rain","prcp","aetTot"),
-                                 labels = c("Total flow","Base flow","Surface flow","Effective rainfall","Precipitation","Actual evpotransipration")))%>%
+                                 labels = c("Total flow","Base flow","Surface flow","Effective rainfall","Precipitation","Evpotransipration")))%>%
           ggplot(aes(x=Year,y=Value,col=Variable))+
           labs(y="(mm/yr)")+
           scale_x_continuous(breaks = c(1980:2018))+
@@ -1005,9 +983,9 @@ shinyServer(function(input, output,session) {
       }else{
         df%>%
           gather(Variable,Value,prcp:PET)%>%
-          filter(Variable %in% c("flwTot","flwBase","flwSurface","rain","prcp","aetTot"))%>%
+          filter(Variable %in% vars_sel[input$plotvars])%>%
           mutate(Variable=factor(Variable,levels = c("flwTot","flwBase","flwSurface","rain","prcp","aetTot"),
-                                 labels = c("Total flow","Base flow","Surface flow","Effective rainfall","Precipitation","Actual evpotransipration")))%>%
+                                 labels = c("Total flow","Base flow","Surface flow","Effective rainfall","Precipitation","Evpotransipration")))%>%
           ggplot(aes(x=Date,y=Value,col=Variable))+
           labs(y="(mm/month)")+
           scale_x_date(date_breaks = "1 year", date_labels = "%Y")+
@@ -1172,7 +1150,119 @@ shinyServer(function(input, output,session) {
     contentType="application/zip"
   )
 
-    ## Action: select time period for calibration and validation----
+  ## Action: select time period for calibration and validation----
+
+  ## Action: Read Basin shapefile for plotting ----
+  #if (!exists("BasinShp")) BasinShp<-NULL
+  observeEvent(input$Input_basin1,{
+    inforprint$plottingresult<-"Processing log: "
+    if(is.null(BasinShp)){
+
+      f_addinfo("plottingresult","Reading shapfile ...")
+      BasinShp<<-f_read_basin(input$Input_basin1$datapath)
+      f_addinfo("plottingresult","Finished processing the uploaded shapefile.")
+
+    }else{
+      f_addinfo("plottingresult","Shapfile is exit and you are ready to plot.")
+    }
+  })
+  ## Print: Print the plottingresult infor ----
+  output$printplotresultinfo<-renderPrint({
+    if(!is.null(inforprint$plottingresult)) writeLines(inforprint$plottingresult)
+  })
+  vars_sel<-c("P"="prcp","Q"="flwTot","ET"="aetTot")
+  ## PlotAction: Plot result maps  ----
+  observeEvent(input$plotresultmap,{
+
+    withProgress(message = 'In process ...', value = 0,{
+      incProgress(0.3, detail = paste("ploting ..."))
+    if(is.null(BasinShp)) {
+      f_addinfo("plottingresult","Shapfile is needed for plotting.")
+      return()
+    }
+      output$resultmap <- renderLeaflet({
+        input$plotresultmap
+        # Plot the BasinShp
+        print("plotting basic map")
+        input_leaflet<-leaflet() %>%
+          addTiles(group = "OSM (default)") %>%
+          addProviderTiles('Esri.WorldImagery',group = "Esri.Imagery")%>%
+          addFullscreenControl()
+        grps<-c("OSM (default)", "Esri.Imagery")
+        ovlgrps<-NULL
+
+        if (!is.null(BasinShp)) {
+          print("Add basin to basic map")
+          popups<-paste0("BasinID = ",BasinShp$BasinID)
+          if("Elev_m" %in% names(BasinShp)) popups<-f_paste(popups,paste0("; Elevatation = ",round(BasinShp$Elev_m,0),"m"))
+
+          ovlgrps<-c(ovlgrps,"Watershed")
+          input_leaflet<-input_leaflet%>%
+            addPolygons(data=BasinShp,weight=1,col = 'red',fillOpacity = 0.2,
+                        highlight = highlightOptions(color='white',weight=1,
+                                                     bringToFront = TRUE),
+                        group = "Watershed")%>%
+            addMarkers(lng = BasinShp$Longitude, lat = BasinShp$Latitude,
+                       popup = popups,
+                       label = paste0("BasinID = ",BasinShp$BasinID),
+                       clusterOptions = markerClusterOptions())
+
+        }
+        vars_sel<-c("P"="prcp","T"="Tavg_C","Q"="flwTot","ET"="aetTot")
+        # add P
+        if("T" %in% input$mapvars){
+          print("Adding Tavg to basic map")
+          popups<-paste0("HUC_ID = ",BasinShp$BasinID,"; Tavg = ",round(BasinShp[["Tavg_C"]],2))
+          ovlgrps<-c(ovlgrps,"Temperature")
+          pal_tmp <- colorBin("YlGn", BasinShp[["Tavg_C"]],n=7,pretty = T)
+
+          input_leaflet<-input_leaflet%>%
+          addPolygons(data=BasinShp,stroke = FALSE, weight = 0.5, smoothFactor = 0.5,
+                      opacity = 1.0, fillOpacity = 0.5,
+                      color = ~pal_tmp(BasinShp[["Tavg_C"]]))%>%
+          addMarkers(lng = BasinShp$Longitude, lat = BasinShp$Latitude,
+                     popup = popups,
+                     label = paste0("HUC_ID = ",BasinShp$BasinID),
+                     clusterOptions = markerClusterOptions())%>%
+            addLegend("bottomleft",pal = pal_tmp, values = BasinShp[["Tavg_C"]],
+                      title = "Mean temp (°C)", group = "Temperature")
+        print("finished adding T")
+          }
+        # add P
+        if("P" %in% input$mapvars){
+          print("Adding Pre to basic map")
+          popups<-paste0("HUC_ID = ",BasinShp$BasinID,"; Ppt_mm = ",round(BasinShp[["Ppt_mm"]],1))
+          ovlgrps<-c(ovlgrps,"Precipitation")
+          pal_tmp <- colorBin("GnBu", BasinShp[["Ppt_mm"]],n=7,pretty = T)
+
+          input_leaflet<-input_leaflet%>%
+            addPolygons(data=BasinShp,color = "gray", weight = 0.5, smoothFactor = 0.5,
+                        opacity = 1.0, fillOpacity = 0.5,
+                        fill = ~pal_tmp(BasinShp[["Ppt_mm"]]))%>%
+            addMarkers(lng = BasinShp$Longitude, lat = BasinShp$Latitude,
+                       popup = popups,
+                       label = paste0("HUC_ID = ",BasinShp$BasinID),
+                       clusterOptions = markerClusterOptions())%>%
+            addLegend("bottomleft",pal = pal_tmp, values = BasinShp[["Ppt_mm"]],
+                      title = "Precipitation (mm)", group = "Precipitation")
+          print("finished adding P")
+        }
+
+        # Layers control
+        input_leaflet %>%
+          addLayersControl(
+            baseGroups = grps,
+            overlayGroups = ovlgrps,
+            options = layersControlOptions(collapsed = FALSE)
+          )
+        print("finished plotting")
+      })
+    })
+  })
+
 
   } # END
 )
+
+
+

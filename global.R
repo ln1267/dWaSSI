@@ -28,6 +28,39 @@ theme_ning<-function(size.axis=5,size.title=6){
     )
 }
 
+f_read_basin<-function(fname){
+  require(rgdal)
+  Basins<- readOGR(fname)
+  if (!"BasinID" %in% names(Basins)) Basins$BasinID<-c(1:length(Basins[,1]))
+  if (is.factor(Basins$BasinID)) Basins$BasinID<-as.integer(as.character(Basins$BasinID))
+  # Add latitude and longitude infor to the Basin
+  if(!"Latitude"  %in% names(Basins)) {
+
+    # get the contral coordinates of each polygon
+    if(is.na(crs(Basins))) proj4string(Basins)<-CRS("+init=epsg:4326")
+    Basins_wgs<-spTransform(Basins,CRS("+init=epsg:4326"))
+    Basin_coords<-gCentroid(Basins_wgs, byid=TRUE)
+    rownames(Basin_coords@coords)<-Basins$BasinID
+    Basin_coords<-as.data.frame(Basin_coords)
+
+    Basins[["Latitude"]]=Basin_coords$y
+    Basins[["Longitude"]]=Basin_coords$x
+
+    # Get the area of each polygon
+    if (!is.projected(Basins)){
+      Basins_pro<-spTransform(Basins,CRS("+init=epsg:32648"))
+      Basins[["Area_m2"]]=round(gArea(Basins_pro,byid = T),2)
+    }else{
+      Basins[["Area_m2"]]=round(gArea(Basins,byid = T),2)
+    }
+
+  }
+  return(Basins)
+}
+
+
+
+
 ## Paste one to one for two vectors, matrixes or arrays----
 #' Paste by value one to one for two vectors, matrixes or arrays
 #' @param x The first object, which can be vector, matrix or array.
@@ -1452,7 +1485,7 @@ librs<-c("dplyr","zip","lubridate","raster","ggplot2","leaflet","rgdal","rgeos",
 f_lib_check(librs)
 
 if(!exists("data_input")) data_input<-list()
-if(!exists("BasinShp")) BasinShp<-NULL
+if(!exists("BasinShp")) BasinShp<<-NULL
 Ning<-"Ning Liu"
 if(!exists("data_simulation")) data_simulation<-list()
 if(!exists("Sim_dates")) Sim_dates<-list()
