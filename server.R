@@ -606,15 +606,16 @@ shinyServer(function(input, output,session) {
 
     data_simulation<<-data_input
 
-
     # Select HUCs for simulation
     StationID<-as.integer(input$StationID)
     routpar<-NULL
+    if (!is.null(input$Input_routpar$datapath)) routpar<-f_stream_level_pete(input$Input_routpar$datapath)
+
     hru_flowlen<-NULL
     if(StationID==0) {
       BasinID_sel <- data_simulation[["Cellinfo"]]$BasinID
       f_addinfo("simulating","No Station is provided, so that all HUCs are used in the simulation!")
-    }else if(is.null(input$Input_routpar)){
+    }else if(is.null(routpar)){
       f_addinfo("simulating","!!! Warning: Flow routing file is not provided!")
 
       BasinID_sel<-c(StationID)
@@ -626,7 +627,6 @@ shinyServer(function(input, output,session) {
 
       #return()
     }else{
-       routpar<-f_stream_level_pete(input$Input_routpar$datapath)
        BasinID_sel<-f_upstreamHUCs(BasinID =StationID ,routpar=routpar)
        BasinID_sel<-c(BasinID_sel,StationID)
        ## Subset each file
@@ -873,23 +873,25 @@ shinyServer(function(input, output,session) {
       group_by(BasinID)%>%
       summarise_all(.funs = mean,na.rm=T)
 
-    print("flow routing for the basin avg")
-    ## flow routing
-    # convert water yield to flow (million m3)
-    Output_BasinID_avg<-merge(Output_BasinID_avg,data_input$Cellinfo[c("BasinID","Area_m2")],by="BasinID")%>%
-      mutate(flwTot=WaYldTot*Area_m2/1000/1000000)%>%
-      dplyr::select(-Area_m2)
+    if(!is.null(routpar)){
+      print("flow routing for the basin avg")
+      ## flow routing
+      # convert water yield to flow (million m3)
+      Output_BasinID_avg<-merge(Output_BasinID_avg,data_input$Cellinfo[c("BasinID","Area_m2")],by="BasinID")%>%
+        mutate(flwTot=WaYldTot*Area_m2/1000/1000000)%>%
+        dplyr::select(-Area_m2)
 
-    Output_BasinID_avg["accFlw"]<-hrurouting(Flwdata = Output_BasinID_avg,routpar =routpar,mc_cores = mcores)
-    Output_BasinID_avg<-Output_BasinID_avg%>%
-      dplyr::select(BasinID,prcp,rain,temp,LAI,PET,PET_hamon,aetTot,
-                  WaYldTot,flwTot,accFlw,WYSurface, WYBase,everything())
-
+      Output_BasinID_avg["accFlw"]<-hrurouting(Flwdata = Output_BasinID_avg,routpar =routpar,mc_cores = mcores)
+      Output_BasinID_avg<-Output_BasinID_avg%>%
+        dplyr::select(BasinID,prcp,rain,temp,LAI,PET,PET_hamon,aetTot,
+                    WaYldTot,flwTot,accFlw,WYSurface, WYBase,everything())
+    }
     Output_BasinID_avg%>%
       write.csv(paste0("www/tmp/Output_BasinID_avg.csv"),row.names=F)
     resultOutput[["Output_Basin_avg"]]<<- Output_BasinID_avg
 
     incProgress(0.1, detail = paste("saving data for each Land cover!"))
+    print("processing data for the each lc")
     # Process output for each land cover
     f_ReshapebyLc<-function(da,Lcs,Output_BasinID){
       out<- da%>%
@@ -929,7 +931,7 @@ shinyServer(function(input, output,session) {
           write.csv(paste0("www/tmp/Output_Lc_avg_",var,".csv"),row.names=F)
 
         if(var=="WaYldTot"){
-          print("flow routing for the each LC avg")
+
           LC_area<-data_input$Cellinfo
           for(lc in Lcs) LC_area[[lc]]<-LC_area[[lc]]*LC_area[["Area_m2"]]
           dd_avg_flw<-merge(dd_avg,LC_area,by="BasinID",all.x=T,suffixes=c(".WaYld",".area"))
@@ -941,18 +943,19 @@ shinyServer(function(input, output,session) {
           resultOutput[["Output_lc_avg"]][["flw"]]<<- dd_avg_flw
           dd_avg_flw%>%
             write.csv(paste0("www/tmp/Output_Lc_avg_flw_Mm3.csv"),row.names=F)
-
-          # routing flow of each vegetation class of all HUC12s
-          for (lc in Lcs){
-            print(paste0("finished flow routing for lc = ",lc))
-            ww<-dd_avg_flw
-            ww$flwTot<-ww[[lc]]
-            dd_avg_flw[lc]<-hrurouting(Flwdata = ww,routpar =routpar,mc_cores = mcores)
+          if(!is.null(routpar)){
+            print("flow routing for the each LC avg")
+            # routing flow of each vegetation class of all HUC12s
+            for (lc in Lcs){
+              print(paste0("finished flow routing for lc = ",lc))
+              ww<-dd_avg_flw
+              ww$flwTot<-ww[[lc]]
+              dd_avg_flw[lc]<-hrurouting(Flwdata = ww,routpar =routpar,mc_cores = mcores)
+            }
+            resultOutput[["Output_lc_avg"]][["accFlw"]]<<- dd_avg_flw
+            dd_avg_flw%>%
+              write.csv(paste0("www/tmp/Output_Lc_avg_accFlw_Mm3.csv"),row.names=F)
           }
-          resultOutput[["Output_lc_avg"]][["accFlw"]]<<- dd_avg_flw
-          dd_avg_flw%>%
-            write.csv(paste0("www/tmp/Output_Lc_avg_accFlw_Mm3.csv"),row.names=F)
-
         }
 
       }else{
