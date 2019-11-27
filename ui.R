@@ -241,7 +241,9 @@ shinyUI(
                  # Input: Result plot variables ----
                  #checkboxGroupInput("mapvars","Select the layers to plot",c("P","T","ET","Q"),selected="Q",inline = T),
                  selectInput("mapvars", "Select the layers to plot.",
-                             choices=c("P","T","ET","Q","LAI")),
+                             choices=c("P","T","ET","Q","LAI","Flow","AccFlow")),
+                 selectInput("mapbrkmethod", "Select the method for breaking the intervals.",
+                             choices=c("equal", "sd","quantile", "fisher-jenks","q6", "geom", "arith","msd")),
                  #checkboxInput("plotannualoutput1", "Annual", FALSE),
                  actionButton("plotresultmap","Plot"),
                  verbatimTextOutput("printplotresultinfo")

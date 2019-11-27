@@ -805,7 +805,7 @@ shinyServer(function(input, output,session) {
     ## Monthly
     resultOutput[["Station_output"]]%>%
       dplyr::select(Date,prcp,rain,temp,LAI,PET,PET_hamon, aetTot,
-                    flwTot, flwSurface, flwBase,everything())%>%
+                    WaYldTot, WYSurface, WYBase,everything())%>%
       write.csv(paste0("www/tmp/Output_outlet_monthly_TS.csv"),row.names=F)
 
     ## Annual
@@ -817,7 +817,7 @@ shinyServer(function(input, output,session) {
       mutate(temp=temp/12,LAI=LAI/12,uztwc=uztwc/12,	uzfwc=uzfwc/12,
              lztwc=lztwc,	lzfpc=lzfpc/12,	lzfsc=lzfsc/12)%>%
       dplyr::select(Year,prcp,rain,temp,LAI,PET,PET_hamon, aetTot,
-                    flwTot, flwSurface, flwBase,everything())
+                    WaYldTot, WYSurface, WYBase,everything())
     annual_output%>%
       write.csv(paste0("www/tmp/Output_outlet_annual_TS.csv"),row.names=F)
     # save annual station annual output the result list
@@ -848,7 +848,7 @@ shinyServer(function(input, output,session) {
       mutate(BasinID=as.integer(as.character(BasinID)))%>%
       dcast(BasinID+Date~Variable)%>%
       dplyr::select(BasinID,Date,prcp,rain,temp,LAI,PET,PET_hamon, aetTot,
-                    flwTot, flwSurface, flwBase,everything())
+                    WaYldTot, WYSurface, WYBase,everything())
     Output_BasinID%>%
       write.csv(paste0("www/tmp/Output_BasinID_monthly_TS.csv"),row.names=F)
     resultOutput[["Output_Basin_monthly"]]<<- Output_BasinID
@@ -862,7 +862,7 @@ shinyServer(function(input, output,session) {
       mutate(temp=temp/12,LAI=LAI/12,uztwc=uztwc/12,	uzfwc=uzfwc/12,
              lztwc=lztwc,	lzfpc=lzfpc/12,	lzfsc=lzfsc/12)%>%
       dplyr::select(BasinID,Year,prcp,rain,temp,LAI,PET,PET_hamon, aetTot,
-                    flwTot, flwSurface, flwBase,everything())
+                    WaYldTot, WYSurface, WYBase,everything())
     Output_BasinID_ann%>%
       write.csv(paste0("www/tmp/Output_BasinID_annual_TS.csv"),row.names=F)
     resultOutput[["Output_Basin_annual"]]<<- Output_BasinID_ann
@@ -872,6 +872,18 @@ shinyServer(function(input, output,session) {
       dplyr::select(-Year)%>%
       group_by(BasinID)%>%
       summarise_all(.funs = mean,na.rm=T)
+
+    print("flow routing for the basin avg")
+    ## flow routing
+    # convert water yield to flow (million m3)
+    Output_BasinID_avg<-merge(Output_BasinID_avg,data_input$Cellinfo[c("BasinID","Area_m2")],by="BasinID")%>%
+      mutate(flwTot=WaYldTot*Area_m2/1000/1000000)%>%
+      dplyr::select(-Area_m2)
+
+    Output_BasinID_avg["accFlw"]<-hrurouting(Flwdata = Output_BasinID_avg,routpar =routpar,mc_cores = mcores)
+    Output_BasinID_avg<-Output_BasinID_avg%>%
+      dplyr::select(BasinID,prcp,rain,temp,LAI,PET,PET_hamon,aetTot,
+                  WaYldTot,flwTot,accFlw,WYSurface, WYBase,everything())
 
     Output_BasinID_avg%>%
       write.csv(paste0("www/tmp/Output_BasinID_avg.csv"),row.names=F)
@@ -893,25 +905,56 @@ shinyServer(function(input, output,session) {
       lc_mon_output<-f_ReshapebyLc(da=resultOutput[["lc_output"]][[var]],
                                    Lcs=Lcs,
                                    Output_BasinID=Output_BasinID)
-      resultOutput[["Output_lc_monthly"]]<<- lc_mon_output
+      resultOutput[["Output_lc_monthly"]][[var]]<<- lc_mon_output
       lc_mon_output%>%
         write.csv(paste0("www/tmp/Output_Lc_monthly_TS_",var,".csv"),row.names=F)
 
       dd_mon<-lc_mon_output%>%
         mutate(Year=as.integer(format(Date,"%Y")))%>%
         dplyr::select(-Date)
-      if(var %in% c("aetTot","flwTot","flwSurface","flwBase","PET")){
+      if(var %in% c("aetTot","WaYldTot","WYSurface","WYBase","PET")){
         dd_ann<-dd_mon %>%
           group_by(BasinID,Year) %>%
           summarise_all(.funs = sum)
+        resultOutput[["Output_lc_annual"]][[var]]<<- dd_ann
         dd_ann%>%
           write.csv(paste0("www/tmp/Output_Lc_annual_TS_",var,".csv"),row.names=F)
 
-        dd_ann %>%
+        dd_avg<-dd_ann %>%
           group_by(BasinID) %>%
           dplyr::select(-Year)%>%
-          summarise_all(.funs = mean)%>%
+          summarise_all(.funs = mean)
+        resultOutput[["Output_lc_avg"]][[var]]<<- dd_avg
+        dd_avg%>%
           write.csv(paste0("www/tmp/Output_Lc_avg_",var,".csv"),row.names=F)
+
+        if(var=="WaYldTot"){
+          print("flow routing for the each LC avg")
+          LC_area<-data_input$Cellinfo
+          for(lc in Lcs) LC_area[[lc]]<-LC_area[[lc]]*LC_area[["Area_m2"]]
+          dd_avg_flw<-merge(dd_avg,LC_area,by="BasinID",all.x=T,suffixes=c(".WaYld",".area"))
+
+          # convert water yield to flow (million m3)
+          for(lc in Lcs) dd_avg_flw[[lc]]<-dd_avg_flw[[paste0(lc,".WaYld")]]*dd_avg_flw[[paste0(lc,".area")]]/1000/1000000
+
+          dd_avg_flw<-dd_avg_flw[,c("BasinID",Lcs)]
+          resultOutput[["Output_lc_avg"]][["flw"]]<<- dd_avg_flw
+          dd_avg_flw%>%
+            write.csv(paste0("www/tmp/Output_Lc_avg_flw_Mm3.csv"),row.names=F)
+
+          # routing flow of each vegetation class of all HUC12s
+          for (lc in Lcs){
+            print(paste0("finished flow routing for lc = ",lc))
+            ww<-dd_avg_flw
+            ww$flwTot<-ww[[lc]]
+            dd_avg_flw[lc]<-hrurouting(Flwdata = ww,routpar =routpar,mc_cores = mcores)
+          }
+          resultOutput[["Output_lc_avg"]][["accFlw"]]<<- dd_avg_flw
+          dd_avg_flw%>%
+            write.csv(paste0("www/tmp/Output_Lc_avg_accFlw_Mm3.csv"),row.names=F)
+
+        }
+
       }else{
         dd_mon %>%
           group_by(BasinID,Year) %>%
@@ -959,7 +1002,7 @@ shinyServer(function(input, output,session) {
   df<-resultOutput[["Station_output"]]%>%
     filter(Date>=plot_dates[1] & Date<=plot_dates[2])
 
-  vars_sel<-c("P"="prcp","Q"="flwTot","ET"="aetTot")
+  vars_sel<-c("P"="prcp","Q"="WaYldTot","ET"="aetTot")
     output$SimOutplot <- renderPlot({
       input$plotsimOut
       #print(head(df))
@@ -971,7 +1014,7 @@ shinyServer(function(input, output,session) {
           summarise_all(.funs = sum)%>%
           gather(Variable,Value,prcp:PET)%>%
           filter(Variable %in% vars_sel[input$plotvars])%>%
-          mutate(Variable=factor(Variable,levels = c("flwTot","flwBase","flwSurface","rain","prcp","aetTot"),
+          mutate(Variable=factor(Variable,levels = c("WaYldTot","WYBase","WYSurface","rain","prcp","aetTot"),
                                  labels = c("Total flow","Base flow","Surface flow","Effective rainfall","Precipitation","Evpotransipration")))%>%
           ggplot(aes(x=Year,y=Value,col=Variable))+
           labs(y="(mm/yr)")+
@@ -984,7 +1027,7 @@ shinyServer(function(input, output,session) {
         df%>%
           gather(Variable,Value,prcp:PET)%>%
           filter(Variable %in% vars_sel[input$plotvars])%>%
-          mutate(Variable=factor(Variable,levels = c("flwTot","flwBase","flwSurface","rain","prcp","aetTot"),
+          mutate(Variable=factor(Variable,levels = c("WaYldTot","WYBase","WYSurface","rain","prcp","aetTot"),
                                  labels = c("Total flow","Base flow","Surface flow","Effective rainfall","Precipitation","Evpotransipration")))%>%
           ggplot(aes(x=Date,y=Value,col=Variable))+
           labs(y="(mm/month)")+
@@ -1007,7 +1050,7 @@ shinyServer(function(input, output,session) {
     f_addinfo("simulplotting","Processing the out to output format!")
     resultOutput[["Station_output"]]%>%
       dplyr::select(Date,prcp,rain,temp,LAI,PET,PET_hamon, aetTot,
-                    flwTot, flwSurface, flwBase,everything())%>%
+                    WaYldTot, WYSurface, WYBase,everything())%>%
       write.csv(paste0("www/tmp/Output_outlet_monthly_TS.csv"),row.names=F)
 
     annual_output<-resultOutput[["Station_output"]]%>%
@@ -1018,7 +1061,7 @@ shinyServer(function(input, output,session) {
       mutate(temp=temp/12,LAI=LAI/12,uztwc=uztwc/12,	uzfwc=uzfwc/12,
              lztwc=lztwc,	lzfpc=lzfpc/12,	lzfsc=lzfsc/12)%>%
       dplyr::select(Year,prcp,rain,temp,LAI,PET,PET_hamon, aetTot,
-                    flwTot, flwSurface, flwBase,everything())
+                    WaYldTot, WYSurface, WYBase,everything())
     resultOutput[["Output_station_annual"]]<<-annual_output
     annual_output%>%
       write.csv(paste0("www/tmp/Output_outlet_annual_TS.csv"),row.names=F)
@@ -1045,7 +1088,7 @@ shinyServer(function(input, output,session) {
         mutate(BasinID=as.integer(as.character(BasinID)))%>%
         dcast(BasinID+Date~Variable)%>%
         dplyr::select(BasinID,Date,prcp,rain,temp,LAI,PET,PET_hamon, aetTot,
-                   flwTot, flwSurface, flwBase,everything())
+                   WaYldTot, WYSurface, WYBase,everything())
     resultOutput[["Output_Basin_monthly"]]<<- Output_BasinID
     Output_BasinID%>%
         write.csv(paste0("www/tmp/Output_BasinID_monthly_TS.csv"),row.names=F)
@@ -1058,7 +1101,7 @@ shinyServer(function(input, output,session) {
       mutate(temp=temp/12,LAI=LAI/12,uztwc=uztwc/12,	uzfwc=uzfwc/12,
              lztwc=lztwc,	lzfpc=lzfpc/12,	lzfsc=lzfsc/12)%>%
       dplyr::select(BasinID,Year,prcp,rain,temp,LAI,PET,PET_hamon, aetTot,
-                    flwTot, flwSurface, flwBase,everything())
+                    WaYldTot, WYSurface, WYBase,everything())
     resultOutput[["Output_Basin_annual"]]<<- Output_BasinID_ann
     Output_BasinID_ann%>%
       write.csv(paste0("www/tmp/Output_BasinID_annual_TS.csv"),row.names=F)
@@ -1093,7 +1136,7 @@ shinyServer(function(input, output,session) {
       dd_mon<-lc_mon_output%>%
         mutate(Year=as.integer(format(Date,"%Y")))%>%
         dplyr::select(-Date)
-      if(var %in% c("aetTot","flwTot","flwSurface","flwBase","PET")){
+      if(var %in% c("aetTot","WaYldTot","WYSurface","WYBase","PET")){
         dd_ann<-dd_mon %>%
           group_by(BasinID,Year) %>%
           summarise_all(.funs = sum)
@@ -1182,19 +1225,30 @@ shinyServer(function(input, output,session) {
     }
 
       ## merge data to the shapefile
-      Basinout<-merge(BasinShp,resultOutput$Output_Basin_avg[c("BasinID","flwTot","LAI","temp","prcp","aetTot")],by="BasinID")
+      index_col<-which(names(resultOutput$Output_Basin_avg) %in% c("BasinID","WaYldTot","LAI","temp","prcp","aetTot","flwTot","accFlw"))
+      Basinout<-merge(BasinShp,resultOutput$Output_Basin_avg[,index_col],by="BasinID",all.y=T)
+      Basinout<-Basinout[Basinout$BasinID %in% BasinID_sel,]
       Basinout<-st_as_sf(Basinout)
       #print(str(Basinout))
 
-      vars_sel<-c("P"="prcp","LAI"="LAI","T"="temp","Q"="flwTot","ET"="aetTot")
-      unit_sel<-c("P"="Precipitation \n (mm/yr)","LAI"="Leaf area index","T"="Temperature \n (C)","Q"="Water yield \n (mm/yr)","ET"="Evapotranspiration \n (mm/yr)")
+      vars_sel<-c("P"="prcp","LAI"="LAI","T"="temp","Q"="WaYldTot","ET"="aetTot","Flow"="flwTot","AccFlow"="accFlw")
+      unit_sel<-c("P"="Precipitation \n (mm/yr)","LAI"="Leaf area index","T"="Temperature \n (C)",
+                  "Q"="Water yield \n (mm/yr)","ET"="Evapotranspiration \n (mm/yr)",
+                  "Flow"="Water supply \n (Million m3/yr)","AccFlow"="Accumulated water supply \n (Million m3/yr)")
       output$outresultmap <- renderPlot({
 
         input$plotresultmap
-        bks1 <- round(getBreaks(v = Basinout[[vars_sel[[input$mapvars]]]], nclass = 5, method = "equal"),0)
+        if(!input$mapvars %in% names(Basinout)){
+          f_addinfo("plottingresult",paste0("It does not have this variable: ",input$mapvars))
+          return()
+        }
+        bks1 <- round(getBreaks(v = Basinout[[vars_sel[[input$mapvars]]]], nclass = 5, method = input$mapbrkmethod),0)
 
-        if(input$mapvars %in% c("P","ET","Q")){
+        # if(input$mapvars %in% c("Flow","AccFlow")){
+        #   bks1 <- round(getBreaks(v = Basinout[[vars_sel[[input$mapvars]]]], nclass = 5, method = input$mapbrkmethod),0)
+        # }
 
+        if(input$mapvars %in% c("P","ET","Q","Flow","AccFlow")){
           brk_cols<-carto.pal(pal1 = "sand.pal",n1=2,pal2 = "blue.pal", n2 = 3)
 
         }else if (input$mapvars %in% c("T")){
@@ -1257,7 +1311,7 @@ shinyServer(function(input, output,session) {
       #     #              label = paste0("BasinID = ",Basinout$BasinID),
       #     #              clusterOptions = markerClusterOptions())
       #     #
-      #     # vars_sel<-c("P"="prcp","LAI"="LAI","T"="temp","Q"="flwTot","ET"="aetTot")
+      #     # vars_sel<-c("P"="prcp","LAI"="LAI","T"="temp","Q"="WaYldTot","ET"="aetTot")
       #   # add P
       #   # if("T" %in% input$mapvars){
       #   #   print("Adding Tavg to basic map")
