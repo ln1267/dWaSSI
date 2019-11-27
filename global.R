@@ -1481,6 +1481,10 @@ WaSSI<-function(hru,datain,sim.dates){
   return(list(output=hru_in,lc_output=hru_lc_out))
 }
 
+library(shinythemes)
+dir.create(file.path("www", "tmp"), showWarnings = FALSE)
+dir.create(file.path("www", "inputs"), showWarnings = FALSE)
+dir.create(file.path("www", "outputs"), showWarnings = FALSE)
 if(file.exists("www/tmpdata.Rdata")) load("www/tmpdata.Rdata")
 
 librs<-c("dplyr","sf","zip","lubridate","raster","ggplot2","leaflet","rgdal","rgeos","cartography","leaflet.extras","parallel","shinyFiles","tidyr","reshape2")

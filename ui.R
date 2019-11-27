@@ -8,9 +8,11 @@ library(shiny)
 # Define UI for dWaSSI-C application
 shinyUI(
   navbarPage(
+
     "dWaSSIC model",
     # Tab: About ----
     tabPanel("About",
+             shinythemes::themeSelector(),  # <--- Add this somewhere in the UI
              column(10, wellPanel(
                #tags$img(src = 'coweeta_logo.jpg',width=600),
 
