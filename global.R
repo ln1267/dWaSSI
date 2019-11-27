@@ -632,19 +632,21 @@ hrurouting<-function(Flwdata,routpar,mc_cores=1){
     water$flow[water$BasinID==hru] +sum(water$flow[water$BasinID %in% routpar$FROM[which(routpar$TO==hru)]])
   }
 
+  Flwdata$flow<-Flwdata$flwTot
   for (level in c(max_level:1)){
     hrus<-unique(routpar$TO[routpar$LEVEL==level])
     #print(paste0("There are ",length(hrus)," hrus in level ",level))
 
     if(length(hrus)>100) {
       flowaccu<-mclapply(hrus,hru_accm,water=Flwdata,routpar=routpar,mc.cores = mc_cores)
-      #print("using paralell")
+
     }else{
       flowaccu<-lapply(hrus,hru_accm,water=Flwdata,routpar=routpar)
+
     }
     for (i in c(1:length(hrus))) Flwdata$flow[Flwdata$BasinID==hrus[i]]<- flowaccu[[i]]
   }
-  return(water)
+  return(Flwdata$flow)
 }
 
 #' This function allows you to get the number of days for a specific month.
@@ -1147,7 +1149,7 @@ sacSma_mon <- function(pet, prcp,par,ini.states = c(0,0,500,500,500,0)) {
     lzfpc_ts[i]  <- lzfpc
     lzfsc_ts[i]  <- lzfsc
   } #close time-loop
-  return(data.frame("aetTot" = simaet,"flwTot" = simflow, "flwSurface" = surf_tot, "flwBase" = base_tot,
+  return(data.frame("aetTot" = simaet,"WaYldTot" = simflow, "WYSurface" = surf_tot, "WYBase" = base_tot,
                     "uztwc"=uztwc_ts,"uzfwc"=uzfwc_ts,
                     "lztwc"=lztwc_ts,"lzfpc"=lzfpc_ts,"lzfsc"=lzfsc_ts))
 }
