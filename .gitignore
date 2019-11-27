@@ -14,7 +14,7 @@ INPUTS/Inputs_grid/*
 data/vars/*
 data/landcover/ESA_LC/*
 OUTPUTS*/*
-www/*
+www8/*
 tmp/*
 data/shps/*
 Result/*
