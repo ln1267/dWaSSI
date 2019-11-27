@@ -1227,7 +1227,7 @@ shinyServer(function(input, output,session) {
       ## merge data to the shapefile
       index_col<-which(names(resultOutput$Output_Basin_avg) %in% c("BasinID","WaYldTot","LAI","temp","prcp","aetTot","flwTot","accFlw"))
       Basinout<-merge(BasinShp,resultOutput$Output_Basin_avg[,index_col],by="BasinID",all.y=T)
-      Basinout<-Basinout[Basinout$BasinID %in% BasinID_sel,]
+      Basinout<-Basinout[Basinout$BasinID %in% resultOutput$Output_Basin_avg$BasinID,]
       Basinout<-st_as_sf(Basinout)
       #print(str(Basinout))
 
@@ -1235,10 +1235,13 @@ shinyServer(function(input, output,session) {
       unit_sel<-c("P"="Precipitation \n (mm/yr)","LAI"="Leaf area index","T"="Temperature \n (C)",
                   "Q"="Water yield \n (mm/yr)","ET"="Evapotranspiration \n (mm/yr)",
                   "Flow"="Water supply \n (Million m3/yr)","AccFlow"="Accumulated water supply \n (Million m3/yr)")
+
+      observeEvent(input$mapvars,{inforprint$plottingresult<-paste0("Processing log: \n","Six Quantiles of ",input$mapvars,": ",paste(round(summary(Basinout[[vars_sel[[input$mapvars]]]]),2),collapse = "; "))
+        })
       output$outresultmap <- renderPlot({
 
         input$plotresultmap
-        if(!input$mapvars %in% names(Basinout)){
+        if(!vars_sel[[input$mapvars]] %in% names(Basinout)){
           f_addinfo("plottingresult",paste0("It does not have this variable: ",input$mapvars))
           return()
         }
@@ -1257,7 +1260,6 @@ shinyServer(function(input, output,session) {
         } else if (input$mapvars %in% c("LAI")){
           brk_cols<-carto.pal(pal1 = "sand.pal",n1=2,pal2 ="green.pal" , n2 = 3)
         }
-
         ggplot() +
             geom_sf(data = Basinout, aes(fill = get(vars_sel[[input$mapvars]])),show.legend = T,lwd=0.04) +
             scale_fill_gradientn(unit_sel[[input$mapvars]],breaks = bks1,colors = brk_cols)+
