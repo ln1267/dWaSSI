@@ -1244,31 +1244,45 @@ shinyServer(function(input, output,session) {
       output$outresultmap <- renderPlot({
 
         input$plotresultmap
-        if(!vars_sel[[input$mapvars]] %in% names(Basinout)){
+        var<-input$mapvars
+
+        if(!vars_sel[[var]] %in% names(Basinout)){
           f_addinfo("plottingresult",paste0("It does not have this variable: ",input$mapvars))
           return()
         }
-        bks1 <- round(getBreaks(v = Basinout[[vars_sel[[input$mapvars]]]], nclass = 5, method = input$mapbrkmethod),0)
 
-        # if(input$mapvars %in% c("Flow","AccFlow")){
-        #   bks1 <- round(getBreaks(v = Basinout[[vars_sel[[input$mapvars]]]], nclass = 5, method = input$mapbrkmethod),0)
-        # }
+        var_values<-Basinout[[vars_sel[[var]]]]
 
-        if(input$mapvars %in% c("P","ET","Q","Flow","AccFlow")){
-          brk_cols<-carto.pal(pal1 = "sand.pal",n1=2,pal2 = "blue.pal", n2 = 3)
+        brk_method<-input$mapbrkmethod
+        k<-6
+        k1<-floor(k/2)
+        k2<-k-k1
 
-        }else if (input$mapvars %in% c("T")){
-          brk_cols<-carto.pal(pal1 = "blue.pal",n1=2,pal2 ="sand.pal" , n2 = 3)
+        bks1 <- round(getBreaks(v = var_values, nclass = k, method =brk_method ),1)
+        bks1[1]<-bks1[1]-0.1
+        bks1[k+1]<-bks1[k+1]+0.1
 
-        } else if (input$mapvars %in% c("LAI")){
-          brk_cols<-carto.pal(pal1 = "sand.pal",n1=2,pal2 ="green.pal" , n2 = 3)
+        if(var %in% c("P","ET","Q","Flow","AccFlow")){
+          brk_cols<-carto.pal(pal1 = "sand.pal",n1=k1,pal2 = "blue.pal", n2 = k2)
+
+        }else if (var %in% c("T")){
+          brk_cols<-carto.pal(pal1 = "blue.pal",n1=k1,pal2 ="sand.pal" , n2 = k2)
+
+        } else if (var %in% c("LAI")){
+          brk_cols<-carto.pal(pal1 = "sand.pal",n1=k1,pal2 ="green.pal" , n2 = k2)
         }
+
+        Basinout<-Basinout%>%
+          mutate(da_cut=cut(var_values,breaks=bks1,include.lowest = T,dig.lab=10))
+
         ggplot() +
-            geom_sf(data = Basinout, aes(fill = get(vars_sel[[input$mapvars]])),show.legend = T,lwd=0.04) +
-            scale_fill_gradientn(unit_sel[[input$mapvars]],breaks = bks1,colors = brk_cols)+
+            geom_sf(data = Basinout, aes(fill = da_cut),show.legend = T,lwd=0.04) +
+          scale_fill_manual(unit_sel[var],values = brk_cols)+
             labs(x="Latitude",y="Longitude")+
             coord_sf(datum = sf::st_crs(4326))+
-            theme_ning(size.axis = 8,size.title = 10)
+          theme_ning(size.axis = 8,size.title = 10)+
+           theme(legend.position="bottom")
+          #
 
 
         # library(mapview)
